@@ -105,12 +105,15 @@
       </section>
 
       <footer class="file-bar">
-        <label for="notionSelect">File to Notion:</label>
-        <select id="notionSelect">
-          <option value="">Loading pages...</option>
-        </select>
-        <button id="fileBtn" class="btn btn-primary" disabled>File to Notion</button>
+        <span id="notionFileGroup" class="notion-file-group" hidden>
+          <label for="notionSelect">File to Notion:</label>
+          <select id="notionSelect">
+            <option value="">Loading pages...</option>
+          </select>
+          <button id="fileBtn" class="btn btn-primary" disabled>File to Notion</button>
+        </span>
         <button id="downloadBtn" class="btn btn-secondary">Save Markdown</button>
+        <span id="notionHint" class="file-status" hidden>Connect Notion in Settings to file notes there directly.</span>
         <span id="fileStatus" class="file-status"></span>
       </footer>
     </div>

@@ -235,6 +235,16 @@ h1 {
   flex-wrap: wrap;
 }
 
+.notion-file-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notion-file-group[hidden] {
+  display: none;
+}
+
 .file-bar select {
   padding: 8px 10px;
   border-radius: 8px;

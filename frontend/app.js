@@ -18,6 +18,16 @@ const downloadBtn = document.getElementById("downloadBtn");
 const fileStatus = document.getElementById("fileStatus");
 const newRecordingBtn = document.getElementById("newRecordingBtn");
 const uploadLabel = document.getElementById("uploadLabel");
+const notionFileGroup = document.getElementById("notionFileGroup");
+const notionHint = document.getElementById("notionHint");
+
+let notionConfigured = false;
+
+function applyNotionConfigured(isConfigured) {
+  notionConfigured = isConfigured;
+  notionFileGroup.hidden = !isConfigured;
+  notionHint.hidden = isConfigured;
+}
 const settingsBtn = document.getElementById("settingsBtn");
 const settingsModal = document.getElementById("settingsModal");
 const settingsIntro = document.getElementById("settingsIntro");
@@ -412,7 +422,7 @@ async function generateSummary(transcriptText) {
     switchTab("summary");
     setStatus("");
     newRecordingBtn.hidden = false;
-    loadNotionPages();
+    if (notionConfigured) loadNotionPages();
   } catch (err) {
     summaryContent.textContent = "";
     notesContent.textContent = "";
@@ -522,6 +532,8 @@ settingsForm.addEventListener("submit", async (e) => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Save failed");
+    applyNotionConfigured(Boolean(cfgNotionKey.value.trim()));
+    if (notionConfigured && lastResult && resultsEl.hidden === false) loadNotionPages();
     settingsStatus.textContent = "Saved. Whisper/vocabulary changes apply next time you restart Recap.";
     setTimeout(closeSettings, 1500);
   } catch (err) {
@@ -531,10 +543,14 @@ settingsForm.addEventListener("submit", async (e) => {
 
 // First-run: if the essential keys aren't set yet, open Settings
 // automatically instead of leaving the user to discover the gear icon.
+// Also drives whether the Notion UI shows at all — it's an optional
+// destination (Save Markdown always works without it), so there's no
+// reason to show a picker that can only ever say "Unavailable".
 (async function checkFirstRun() {
   try {
     const res = await fetch("/api/settings");
     const data = await res.json();
+    applyNotionConfigured(Boolean(data.NOTION_API_KEY));
     if (!data.ANTHROPIC_API_KEY) {
       openSettings({ isFirstRun: true });
     }
