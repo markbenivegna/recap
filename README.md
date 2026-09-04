@@ -107,14 +107,25 @@ MIDI Setup instead.
 
 ## Speaker labels
 
-Recordings are automatically split by speaker ("Speaker 1", "Speaker 2", ...)
-using a speaker-embedding model (`speechbrain/spkrec-ecapa-voxceleb` — an
-openly downloadable model, no account or sign-up needed, unlike some
-diarization tools). This runs locally alongside Whisper. When summarizing,
-Claude will use a speaker's real name in the summary/notes if it's clear from
-what's actually said in the conversation (e.g. someone being greeted or
-introduced by name); otherwise it keeps the generic "Speaker N" label rather
-than guessing.
+Recordings are automatically split by speaker using a speaker-embedding
+model (`speechbrain/spkrec-ecapa-voxceleb` — an openly downloadable model, no
+account or sign-up needed, unlike some diarization tools). This runs locally
+alongside Whisper. When summarizing, Claude will use a speaker's real name in
+the summary/notes if it's clear from what's actually said in the
+conversation (e.g. someone being greeted or introduced by name); otherwise it
+keeps the generic label rather than guessing.
+
+When [system audio capture](#system-audio-hearing-both-sides-of-a-call) is
+active, the app records the mic and system audio as two extra, separate
+reference tracks (in addition to the main mixed recording used for
+transcription) so it can tell which source each moment of the transcript
+came from directly, by comparing loudness, rather than relying purely on
+voice similarity — which struggles when two voices happen to sound alike.
+The dominant voice on the mic is labeled **"You"**; every other distinct
+voice — whether an extra voice sharing the mic (e.g. an in-person guest) or
+any number of voices coming through system audio — gets a normal "Speaker N"
+label. Without system audio capture active, it falls back to
+voice-embedding clustering alone across the whole recording, same as before.
 
 `DIARIZATION_THRESHOLD` in `.env` controls how aggressively segments are
 split into different speakers vs. merged together — see `.env.example` for

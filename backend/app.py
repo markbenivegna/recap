@@ -9,7 +9,7 @@ from flask import Flask, jsonify, request, send_from_directory
 load_dotenv()
 
 from backend import audio_switch, markdown_export, notion_client
-from backend.diarize import diarize_segments, format_transcript_with_speakers
+from backend.diarize import diarize_segments, diarize_with_source_separation, format_transcript_with_speakers
 from backend.summarize import summarize_transcript
 from backend.transcribe import transcribe_audio
 
@@ -42,14 +42,29 @@ def api_transcribe():
         return jsonify({"error": "Empty filename"}), 400
 
     os.makedirs(RECORDINGS_DIR, exist_ok=True)
-    ext = os.path.splitext(audio_file.filename)[1] or ".wav"
-    saved_path = os.path.join(RECORDINGS_DIR, f"{uuid.uuid4().hex}{ext}")
-    audio_file.save(saved_path)
+
+    def _save(upload, label):
+        ext = os.path.splitext(upload.filename)[1] or ".wav"
+        path = os.path.join(RECORDINGS_DIR, f"{uuid.uuid4().hex}-{label}{ext}")
+        upload.save(path)
+        return path
+
+    saved_path = _save(audio_file, "main")
+    # Optional reference tracks (unmixed mic-only / system-audio-only,
+    # recorded in parallel with the main file) — let diarization tell which
+    # source a segment came from directly, instead of relying purely on
+    # voice-similarity clustering, which struggles when two voices sound
+    # alike (e.g. mistaking a video's narrator for the user).
+    mic_path = _save(request.files["mic_audio"], "mic") if "mic_audio" in request.files else None
+    system_path = _save(request.files["system_audio"], "system") if "system_audio" in request.files else None
 
     try:
         result = transcribe_audio(saved_path)
         try:
-            diarize_segments(saved_path, result["segments"])
+            if mic_path and system_path:
+                diarize_with_source_separation(mic_path, system_path, result["segments"])
+            else:
+                diarize_segments(saved_path, result["segments"])
             result["text"] = format_transcript_with_speakers(result["segments"])
         except Exception:
             # Speaker labeling is best-effort — fall back to a plain
@@ -59,8 +74,9 @@ def api_transcribe():
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
     finally:
-        if os.path.exists(saved_path):
-            os.remove(saved_path)
+        for path in (saved_path, mic_path, system_path):
+            if path and os.path.exists(path):
+                os.remove(path)
 
 
 @app.route("/api/summarize", methods=["POST"])

@@ -18,7 +18,11 @@ const downloadBtn = document.getElementById("downloadBtn");
 const fileStatus = document.getElementById("fileStatus");
 
 let mediaRecorder = null;
+let micRecorder = null;
+let systemRecorder = null;
 let recordedChunks = [];
+let micChunks = [];
+let systemChunks = [];
 let recording = false;
 let timerInterval = null;
 let recordingStart = null;
@@ -130,12 +134,13 @@ async function startRecording() {
     activeStreams = [micStream];
 
     let usingSystemAudio = false;
+    let systemStream = null;
     const blackHoleId = await findBlackHoleDeviceId();
     let mixedStream = micStream;
 
     if (blackHoleId) {
       try {
-        const systemStream = await navigator.mediaDevices.getUserMedia({
+        systemStream = await navigator.mediaDevices.getUserMedia({
           audio: { deviceId: { exact: blackHoleId } },
         });
         activeStreams.push(systemStream);
@@ -152,15 +157,44 @@ async function startRecording() {
         // BlackHole device exists but couldn't be opened (e.g. not set as
         // part of a Multi-Output Device yet) — fall back to mic-only.
         mixedStream = micStream;
+        systemStream = null;
       }
     }
 
     recordedChunks = [];
+    micChunks = [];
+    systemChunks = [];
+    const stopPromises = [];
+
     mediaRecorder = new MediaRecorder(mixedStream);
     mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) recordedChunks.push(e.data);
     };
-    mediaRecorder.onstop = () => {
+    stopPromises.push(new Promise((resolve) => (mediaRecorder.onstop = resolve)));
+
+    // Also record the mic and system-audio tracks separately (unmixed) when
+    // both are present. These aren't used for transcription — the mixed
+    // track stays the source of truth for that — but let the backend tell,
+    // per transcript segment, whether it came from the mic (you) or system
+    // audio (everyone else on the call), instead of relying purely on
+    // voice similarity, which struggles when two voices sound alike.
+    micRecorder = null;
+    systemRecorder = null;
+    if (usingSystemAudio) {
+      micRecorder = new MediaRecorder(micStream);
+      micRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) micChunks.push(e.data);
+      };
+      stopPromises.push(new Promise((resolve) => (micRecorder.onstop = resolve)));
+
+      systemRecorder = new MediaRecorder(systemStream);
+      systemRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) systemChunks.push(e.data);
+      };
+      stopPromises.push(new Promise((resolve) => (systemRecorder.onstop = resolve)));
+    }
+
+    Promise.all(stopPromises).then(() => {
       activeStreams.forEach((s) => s.getTracks().forEach((track) => track.stop()));
       activeStreams = [];
       if (audioCtx) {
@@ -169,9 +203,14 @@ async function startRecording() {
       }
       fetch("/api/audio/restore", { method: "POST" }).catch(() => {});
       const blob = new Blob(recordedChunks, { type: "audio/webm" });
-      handleAudioBlob(blob, "recording.webm");
-    };
+      const micBlob = micChunks.length ? new Blob(micChunks, { type: "audio/webm" }) : null;
+      const systemBlob = systemChunks.length ? new Blob(systemChunks, { type: "audio/webm" }) : null;
+      handleAudioBlob(blob, "recording.webm", micBlob, systemBlob);
+    });
+
     mediaRecorder.start();
+    if (micRecorder) micRecorder.start();
+    if (systemRecorder) systemRecorder.start();
     recording = true;
     recordingStart = Date.now();
     recordBtn.textContent = "Stop";
@@ -190,7 +229,9 @@ async function startRecording() {
 function stopRecording() {
   if (mediaRecorder && recording) {
     stopWaveform();
-    mediaRecorder.stop();
+    [mediaRecorder, micRecorder, systemRecorder].forEach((r) => {
+      if (r && r.state !== "inactive") r.stop();
+    });
     recording = false;
     recordBtn.textContent = "Record";
     recordBtn.classList.remove("recording");
@@ -210,18 +251,20 @@ recordBtn.addEventListener("click", () => {
 fileInput.addEventListener("change", () => {
   const file = fileInput.files[0];
   if (file) {
-    handleAudioBlob(file, file.name);
+    handleAudioBlob(file, file.name, null, null);
   }
   fileInput.value = "";
 });
 
-async function handleAudioBlob(blob, filename) {
+async function handleAudioBlob(blob, filename, micBlob, systemBlob) {
   emptyEl.hidden = true;
   resultsEl.hidden = false;
   setStatus("Transcribing locally (this can take a minute)...", false, true);
 
   const formData = new FormData();
   formData.append("audio", blob, filename);
+  if (micBlob) formData.append("mic_audio", micBlob, "mic.webm");
+  if (systemBlob) formData.append("system_audio", systemBlob, "system.webm");
 
   try {
     const res = await fetch("/api/transcribe", { method: "POST", body: formData });
