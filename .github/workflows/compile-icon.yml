@@ -2,9 +2,6 @@ name: Compile Icon Composer bundle
 
 on:
   workflow_dispatch: {}
-  push:
-    branches: [master]
-    paths: [".github/workflows/compile-icon.yml"]
 
 jobs:
   compile:
