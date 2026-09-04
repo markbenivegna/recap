@@ -23,6 +23,7 @@ def _meeting_title(raw_title):
 
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
 RECORDINGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "recordings")
+ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets")
 
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 
@@ -30,6 +31,11 @@ app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 @app.route("/")
 def index():
     return send_from_directory(FRONTEND_DIR, "index.html")
+
+
+@app.route("/icon.png")
+def icon():
+    return send_from_directory(ASSETS_DIR, "icon.png")
 
 
 @app.route("/api/transcribe", methods=["POST"])
