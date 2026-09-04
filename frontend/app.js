@@ -17,6 +17,7 @@ const fileBtn = document.getElementById("fileBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 const fileStatus = document.getElementById("fileStatus");
 const newRecordingBtn = document.getElementById("newRecordingBtn");
+const uploadLabel = document.getElementById("uploadLabel");
 const settingsBtn = document.getElementById("settingsBtn");
 const settingsModal = document.getElementById("settingsModal");
 const settingsIntro = document.getElementById("settingsIntro");
@@ -307,10 +308,16 @@ fileInput.addEventListener("change", () => {
   fileInput.value = "";
 });
 
+function showIdleControls(show) {
+  recordBtn.hidden = !show;
+  uploadLabel.hidden = !show;
+}
+
 function resetToNewRecording() {
   lastResult = null;
   resultsEl.hidden = true;
   newRecordingBtn.hidden = true;
+  showIdleControls(true);
   emptyEl.hidden = false;
   meetingTitleEl.hidden = true;
   meetingTitleEl.textContent = "";
@@ -330,6 +337,7 @@ async function handleAudioBlob(blob, filename, micBlob, systemBlob) {
   emptyEl.hidden = true;
   resultsEl.hidden = false;
   newRecordingBtn.hidden = true;
+  showIdleControls(false);
   setStatus("Transcribing locally (this can take a minute)...", false, true);
 
   const formData = new FormData();
@@ -347,6 +355,7 @@ async function handleAudioBlob(blob, filename, micBlob, systemBlob) {
     await generateSummary(data.text);
   } catch (err) {
     setStatus(`Error: ${err.message}`, true);
+    showIdleControls(true);
   }
 }
 
@@ -408,6 +417,7 @@ async function generateSummary(transcriptText) {
     summaryContent.textContent = "";
     notesContent.textContent = "";
     setStatus(`Summary error: ${err.message}`, true);
+    showIdleControls(true);
   }
 }
 
