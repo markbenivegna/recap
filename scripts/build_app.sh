@@ -87,7 +87,10 @@ cd "\$PROJECT_DIR" || exit 1
 arch -arm64 "\$PYTHON" main.py >> "\$LOG_FILE" 2>&1
 STATUS=\$?
 
-if [ \$STATUS -ne 0 ]; then
+# Closing the window terminates the process via a signal (exit code 143,
+# etc.) — that's normal, not a crash. Only alert when the log shows an
+# actual Python traceback, so quitting the app normally stays silent.
+if [ \$STATUS -ne 0 ] && tail -n 30 "\$LOG_FILE" | grep -q "Traceback"; then
     TAIL=\$(tail -n 5 "\$LOG_FILE" | tr -d '"' | tr '\n' ' ')
     osascript -e 'display alert "Meeting Notes quit unexpectedly" message "'"\$TAIL"'" as critical'
 fi
