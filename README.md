@@ -73,3 +73,29 @@ Once that's set up, the app automatically detects BlackHole and mixes it with
 your mic when you hit Record — no extra steps in the app itself. If BlackHole
 isn't installed or isn't wired up yet, it just falls back to mic-only, same
 as before.
+
+If your speakers are connected over Bluetooth, macOS's Multi-Output Device
+handling of Bluetooth output is unreliable (a known OS-level limitation, not
+something this app or BlackHole can work around) — if you get silence after
+setting this up, double check System Settings → Sound (or the menu bar) has
+the **Multi-Output Device** selected, not BlackHole directly (selecting
+BlackHole alone sends everything to a silent virtual sink). Also note that
+while a Multi-Output Device is your output, the normal volume keys/menu bar
+slider often stop reliably controlling your actual speakers — use the volume
+slider next to your speakers inside the Multi-Output Device panel in Audio
+MIDI Setup instead.
+
+## Speaker labels
+
+Recordings are automatically split by speaker ("Speaker 1", "Speaker 2", ...)
+using a speaker-embedding model (`speechbrain/spkrec-ecapa-voxceleb` — an
+openly downloadable model, no account or sign-up needed, unlike some
+diarization tools). This runs locally alongside Whisper. When summarizing,
+Claude will use a speaker's real name in the summary/notes if it's clear from
+what's actually said in the conversation (e.g. someone being greeted or
+introduced by name); otherwise it keeps the generic "Speaker N" label rather
+than guessing.
+
+`DIARIZATION_THRESHOLD` in `.env` controls how aggressively segments are
+split into different speakers vs. merged together — see `.env.example` for
+details. The embedding model downloads once (to `.cache/`) on first use.

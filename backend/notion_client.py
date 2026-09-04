@@ -134,19 +134,44 @@ def _markdown_to_blocks(text):
     return blocks
 
 
+_SPEAKER_TURN_RE = re.compile(r"^(Speaker \d+): (.*)$", re.DOTALL)
+
+
+def _chunk_text(text, size=1900):
+    return [text[i : i + size] for i in range(0, len(text), size)] or [""]
+
+
 def _transcript_toggle(transcript):
     """A collapsed toggle block holding the full transcript, so an hour-plus
     meeting doesn't dominate the page — everyone sees Summary/Notes first
-    and opens the transcript only if they need it."""
-    # Notion caps rich_text content at 2000 chars per block; chunk long transcripts.
-    chunks = [
-        {
-            "object": "block",
-            "type": "paragraph",
-            "paragraph": {"rich_text": [{"type": "text", "text": {"content": transcript[i : i + 1900]}}]},
-        }
-        for i in range(0, len(transcript), 1900)
-    ]
+    and opens the transcript only if they need it. Each speaker turn (from
+    format_transcript_with_speakers) becomes its own paragraph with the
+    speaker label bolded; falls back to blind chunking for plain,
+    non-diarized transcripts (e.g. if diarization failed for that recording)."""
+    turns = transcript.split("\n\n") if "\n\n" in transcript else [transcript]
+
+    chunks = []
+    for turn in turns:
+        match = _SPEAKER_TURN_RE.match(turn)
+        if match:
+            speaker, body = match.group(1), match.group(2)
+            for i, piece in enumerate(_chunk_text(body)):
+                rich_text = (
+                    [{"type": "text", "text": {"content": f"{speaker}: "}, "annotations": {"bold": True}}]
+                    if i == 0
+                    else []
+                ) + [{"type": "text", "text": {"content": piece}}]
+                chunks.append({"object": "block", "type": "paragraph", "paragraph": {"rich_text": rich_text}})
+        else:
+            for piece in _chunk_text(turn):
+                chunks.append(
+                    {
+                        "object": "block",
+                        "type": "paragraph",
+                        "paragraph": {"rich_text": [{"type": "text", "text": {"content": piece}}]},
+                    }
+                )
+
     # Notion allows at most 100 children per block; trim if a transcript is extreme.
     chunks = chunks[:100]
 

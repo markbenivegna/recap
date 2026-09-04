@@ -175,12 +175,27 @@ async function handleAudioBlob(blob, filename) {
 function renderTranscript(data) {
   lastResult = { ...lastResult, text: data.text, segments: data.segments };
   transcriptContent.innerHTML = "";
+  let lastSpeaker = null;
   data.segments.forEach((seg) => {
     const div = document.createElement("div");
     div.className = "transcript-segment";
+
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "transcript-time";
     const mins = String(Math.floor(seg.start / 60)).padStart(2, "0");
     const secs = String(Math.floor(seg.start % 60)).padStart(2, "0");
-    div.innerHTML = `<span class="transcript-time">${mins}:${secs}</span>${seg.text}`;
+    timeSpan.textContent = `${mins}:${secs}`;
+    div.appendChild(timeSpan);
+
+    if (seg.speaker && seg.speaker !== lastSpeaker) {
+      const speakerSpan = document.createElement("span");
+      speakerSpan.className = "transcript-speaker";
+      speakerSpan.textContent = `${seg.speaker}: `;
+      div.appendChild(speakerSpan);
+      lastSpeaker = seg.speaker;
+    }
+
+    div.appendChild(document.createTextNode(seg.text));
     transcriptContent.appendChild(div);
   });
   switchTab("transcript");

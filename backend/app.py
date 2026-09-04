@@ -8,6 +8,7 @@ from flask import Flask, jsonify, request, send_from_directory
 load_dotenv()
 
 from backend import notion_client
+from backend.diarize import diarize_segments, format_transcript_with_speakers
 from backend.summarize import summarize_transcript
 from backend.transcribe import transcribe_audio
 
@@ -38,6 +39,13 @@ def api_transcribe():
 
     try:
         result = transcribe_audio(saved_path)
+        try:
+            diarize_segments(saved_path, result["segments"])
+            result["text"] = format_transcript_with_speakers(result["segments"])
+        except Exception:
+            # Speaker labeling is best-effort — fall back to a plain
+            # transcript rather than failing the whole request over it.
+            pass
         return jsonify(result)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500

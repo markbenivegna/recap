@@ -7,3 +7,4 @@ recordings/*
 .DS_Store
 meeting-notes.log
 assets/icon.iconset/
+.cache/

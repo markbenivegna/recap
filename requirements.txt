@@ -4,4 +4,5 @@ python-dotenv==1.0.1
 anthropic>=0.125.0
 requests==2.32.3
 pywebview==5.3.2
-pyobjc-framework-AVFoundation
+speechbrain
+scikit-learn

@@ -14,6 +14,13 @@ discussed (e.g. "Q3 Roadmap Planning", "Client Onboarding Call: Acme Corp"). Not
 (use only the headings that apply; skip a heading if there's nothing for it). Format each group \
 heading as its own line wrapped in double asterisks, e.g. **Key Points**.
 
+The transcript's turns are labeled by voice, like "Speaker 1:" or "Speaker 2:" — these are \
+automatically detected voices, not necessarily correct or stable if a speaker is briefly silent. \
+If someone's real name becomes clear from what's actually said (introductions, being addressed \
+by name, signing off with a name), use that name in the summary and notes instead of the \
+generic label. If a speaker's name never comes up, keep referring to them by their generic \
+label rather than guessing a name.
+
 Respond with exactly this format, no preamble:
 
 TITLE:

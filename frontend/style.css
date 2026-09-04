@@ -183,6 +183,11 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
+.transcript-speaker {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
 .file-bar {
   display: flex;
   align-items: center;
