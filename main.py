@@ -8,7 +8,7 @@ from backend.app import app
 
 HOST = "127.0.0.1"
 PREFERRED_PORT = 51823
-APP_NAME = "Meeting Notes"
+APP_NAME = "Recap"
 ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png")
 
 

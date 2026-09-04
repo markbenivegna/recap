@@ -5,6 +5,6 @@ __pycache__/
 recordings/*
 !recordings/.gitkeep
 .DS_Store
-meeting-notes.log
+recap.log
 assets/icon.iconset/
 .cache/

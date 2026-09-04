@@ -1,11 +1,11 @@
 #!/bin/bash
-# Rebuilds the "Meeting Notes.app" launcher bundle in ~/Applications.
+# Rebuilds the "Recap.app" launcher bundle in ~/Applications.
 # Run this again after moving the project folder, recreating the venv, or
 # regenerating the icon (assets/generate_icon.py) and wanting new artwork.
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="$HOME/Applications/Meeting Notes.app"
+APP_DIR="$HOME/Applications/Recap.app"
 VENV_PYTHON="$PROJECT_DIR/venv/bin/python3"
 
 if [ ! -x "$VENV_PYTHON" ]; then
@@ -57,9 +57,9 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>Meeting Notes</string>
+	<string>Recap</string>
 	<key>CFBundleDisplayName</key>
-	<string>Meeting Notes</string>
+	<string>Recap</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.markbenivegna.meetingnotes</string>
 	<key>CFBundleVersion</key>
@@ -69,13 +69,13 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleExecutable</key>
-	<string>MeetingNotes</string>
+	<string>Recap</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Meeting Notes needs microphone access to record your meetings.</string>
+	<string>Recap needs microphone access to record your meetings.</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>11.0</string>
 </dict>
@@ -84,7 +84,7 @@ PLIST
 
 # --- Embed a native arm64 copy of the interpreter inside our own bundle ---
 # This is what lets macOS attribute the microphone permission prompt to
-# "Meeting Notes" at all: TCC resolves privacy-prompt ownership from the
+# "Recap" at all: TCC resolves privacy-prompt ownership from the
 # actual running executable's on-disk path. Running the system's shared
 # Python.app binary directly (the old approach) meant that path resolved to
 # CommandLineTools' own Python.app bundle, which declares no
@@ -105,18 +105,18 @@ codesign -s - -f "$RUNTIME"
 chmod +x "$RUNTIME"
 
 # --- Launcher ---
-cat > "$APP_DIR/Contents/MacOS/MeetingNotes" <<LAUNCHER
+cat > "$APP_DIR/Contents/MacOS/Recap" <<LAUNCHER
 #!/bin/bash
-# Launcher for the Meeting Notes app bundle. Runs the embedded interpreter
+# Launcher for the Recap app bundle. Runs the embedded interpreter
 # (Contents/MacOS/PythonRuntime) against the real project's venv packages,
 # so the .app stays a thin pointer to the actual project on disk.
 
 PROJECT_DIR="$PROJECT_DIR"
 RUNTIME="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)/PythonRuntime"
-LOG_FILE="\$PROJECT_DIR/meeting-notes.log"
+LOG_FILE="\$PROJECT_DIR/recap.log"
 
 if [ ! -x "\$RUNTIME" ] || [ ! -d "\$PROJECT_DIR/venv" ]; then
-    osascript -e 'display alert "Meeting Notes" message "Setup is missing (no venv found at '"\$PROJECT_DIR"'). Run the setup steps in README.md first." as critical'
+    osascript -e 'display alert "Recap" message "Setup is missing (no venv found at '"\$PROJECT_DIR"'). Run the setup steps in README.md first." as critical'
     exit 1
 fi
 
@@ -134,12 +134,12 @@ STATUS=\$?
 # actual Python traceback, so quitting the app normally stays silent.
 if [ \$STATUS -ne 0 ] && tail -n 30 "\$LOG_FILE" | grep -q "Traceback"; then
     TAIL=\$(tail -n 5 "\$LOG_FILE" | tr -d '"' | tr '\n' ' ')
-    osascript -e 'display alert "Meeting Notes quit unexpectedly" message "'"\$TAIL"'" as critical'
+    osascript -e 'display alert "Recap quit unexpectedly" message "'"\$TAIL"'" as critical'
 fi
 
 exit \$STATUS
 LAUNCHER
-chmod +x "$APP_DIR/Contents/MacOS/MeetingNotes"
+chmod +x "$APP_DIR/Contents/MacOS/Recap"
 
 xattr -cr "$APP_DIR"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_DIR"

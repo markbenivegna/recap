@@ -1,4 +1,4 @@
-# Meeting Notes
+# Recap
 
 Local macOS app: record or upload a meeting, transcribe it on-device with
 `faster-whisper`, summarize it with the Claude API, and file the result into
@@ -26,13 +26,13 @@ Finally, build the double-clickable app:
 ./scripts/build_app.sh
 ```
 
-This creates **Meeting Notes.app** in `~/Applications` with a custom icon. Open it from Finder or Launchpad like any other app — no terminal needed after this point.
+This creates **Recap.app** in `~/Applications` with a custom icon. Open it from Finder or Launchpad like any other app — no terminal needed after this point.
 
 The first launch may show an "unidentified developer" Gatekeeper warning since the app isn't code-signed; right-click the app and choose **Open** once to get past it.
 
 ## Run
 
-The normal way, day to day: open **Meeting Notes** from `~/Applications` (or Launchpad) like any other app.
+The normal way, day to day: open **Recap** from `~/Applications` (or Launchpad) like any other app.
 
 For debugging, you can also run it directly from a terminal:
 
