@@ -109,7 +109,8 @@ h1 {
   padding: 10px 14px;
   border-radius: 8px;
   font-size: 14px;
-  font-weight: 600;
+  line-height: 20px;
+  font-weight: 500;
   cursor: pointer;
   transition: background-color 100ms linear, box-shadow 100ms linear;
 }
@@ -321,13 +322,21 @@ h1 {
   color: var(--muted);
 }
 
-/* Utility icon button (their button-utility.tsx): smaller radius and much
-   tighter padding than a regular button — it's sized to just the icon. */
+/* Utility icon button (their button-utility.tsx): smaller radius than a
+   regular button, but sized to match the height/width of the buttons
+   next to it (regular .btn is 40px tall: 10px+10px padding + 20px line-
+   height) — explicit width/height instead of padding math, since a text
+   glyph's box doesn't reliably center/size the way a real SVG icon would. */
 .btn-icon {
-  padding: 6px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
   border-radius: 6px;
-  font-size: 16px;
+  font-size: 20px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .modal-overlay {

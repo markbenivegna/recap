@@ -26,6 +26,7 @@ RECORDINGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__
 ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets")
 
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
 
 @app.route("/")
