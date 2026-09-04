@@ -4,6 +4,11 @@ Local macOS app: record or upload a meeting, transcribe it on-device with
 `faster-whisper`, summarize it with the Claude API, and file the result into
 Notion as a new page.
 
+![Summary view](assets/screenshot-summary.png)
+![Transcript view with speaker labels](assets/screenshot-transcript.png)
+
+(Screenshots use placeholder content, not real meeting data.)
+
 ## Setup
 
 ### 0. Prerequisites
