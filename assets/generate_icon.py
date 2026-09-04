@@ -9,8 +9,8 @@ from PIL import Image, ImageDraw
 SIZE = 1024
 OUT_PATH = os.path.join(os.path.dirname(__file__), "icon.png")
 
-BG_TOP = (217, 119, 87)  # matches --accent-hover from frontend/style.css
-BG_BOTTOM = (181, 83, 60)  # matches --accent
+BG_TOP = (224, 185, 61)  # matches --accent (dark mode) from frontend/style.css
+BG_BOTTOM = (168, 127, 34)  # matches --accent-hover (light mode)
 GLYPH = (255, 250, 246)
 
 

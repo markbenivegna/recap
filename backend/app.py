@@ -75,7 +75,9 @@ def api_notion_file():
     summary = data.get("summary", "")
     notes = data.get("notes", "")
     transcript = data.get("transcript", "")
-    title = data.get("title") or f"Meeting Notes - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    meeting_title = (data.get("title") or "").strip()
+    formatted_date = datetime.now().strftime("%-m/%-d/%Y at %-I:%M %p")
+    title = f"{meeting_title} - {formatted_date}" if meeting_title else f"Meeting Notes - {formatted_date}"
 
     if not parent_id:
         return jsonify({"error": "parent_id is required"}), 400

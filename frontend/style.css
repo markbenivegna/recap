@@ -5,8 +5,8 @@
   --border: #e2e0db;
   --text: #1f1e1c;
   --muted: #726e66;
-  --accent: #b5533c;
-  --accent-hover: #9a4531;
+  --accent: #c99a2e;
+  --accent-hover: #a87f22;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -16,8 +16,8 @@
     --border: #3a3733;
     --text: #ece9e4;
     --muted: #a39d92;
-    --accent: #d97757;
-    --accent-hover: #e58a6b;
+    --accent: #e0b93d;
+    --accent-hover: #f0cb5e;
   }
 }
 
@@ -120,6 +120,12 @@ h1 {
   text-align: center;
   padding: 80px 20px;
   font-size: 15px;
+}
+
+.meeting-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0 0 12px;
 }
 
 .tabs {

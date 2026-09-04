@@ -4,13 +4,20 @@ import anthropic
 
 MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 
-SYSTEM_PROMPT = """You turn raw meeting transcripts into two things:
+SYSTEM_PROMPT = """You turn raw meeting transcripts into three things:
 
-1. A concise summary — a few sentences describing what the meeting was about and the outcome.
-2. Structured notes — bullet points grouped under "Key Points", "Decisions", and "Action Items" \
-(use only the headings that apply; skip a heading if there's nothing for it).
+1. A short descriptive title for the meeting — 3-7 words, specific to what was actually \
+discussed (e.g. "Q3 Roadmap Planning", "Client Onboarding Call: Acme Corp"). Not generic \
+("Meeting Notes", "Team Sync") unless the transcript genuinely gives you nothing more specific.
+2. A concise summary — a few sentences describing what the meeting was about and the outcome.
+3. Structured notes — bullet points grouped under "Key Points", "Decisions", and "Action Items" \
+(use only the headings that apply; skip a heading if there's nothing for it). Format each group \
+heading as its own line wrapped in double asterisks, e.g. **Key Points**.
 
 Respond with exactly this format, no preamble:
+
+TITLE:
+<title text>
 
 SUMMARY:
 <summary text>
@@ -44,18 +51,19 @@ def summarize_transcript(transcript_text):
 
 
 def _parse_response(raw):
-    summary = ""
-    notes = ""
-
+    summary_idx = raw.find("SUMMARY:")
     notes_idx = raw.find("NOTES:")
-    if notes_idx == -1:
-        # Model didn't follow the format; treat the whole thing as summary.
-        return {"summary": raw.strip(), "notes": ""}
 
-    summary_part = raw[:notes_idx]
+    if summary_idx == -1 or notes_idx == -1:
+        # Model didn't follow the format; treat the whole thing as summary.
+        return {"title": "", "summary": raw.strip(), "notes": ""}
+
+    title_part = raw[:summary_idx]
+    summary_part = raw[summary_idx + len("SUMMARY:"):notes_idx]
     notes_part = raw[notes_idx + len("NOTES:"):]
 
-    summary = summary_part.replace("SUMMARY:", "").strip()
+    title = title_part.replace("TITLE:", "").strip()
+    summary = summary_part.strip()
     notes = notes_part.strip()
 
-    return {"summary": summary, "notes": notes}
+    return {"title": title, "summary": summary, "notes": notes}

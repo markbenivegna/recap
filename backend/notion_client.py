@@ -1,4 +1,5 @@
 import os
+import re
 
 import requests
 
@@ -57,20 +58,55 @@ def list_pages():
     return pages
 
 
-def _text_blocks(text):
+_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+_HEADER_LINE_RE = re.compile(r"^\*\*(.+)\*\*$")
+
+
+def _inline_rich_text(text):
+    """Split a line on **bold** spans into Notion rich_text objects."""
+    parts = []
+    last_end = 0
+    for match in _BOLD_RE.finditer(text):
+        if match.start() > last_end:
+            parts.append({"type": "text", "text": {"content": text[last_end:match.start()]}})
+        parts.append(
+            {
+                "type": "text",
+                "text": {"content": match.group(1)},
+                "annotations": {"bold": True},
+            }
+        )
+        last_end = match.end()
+    if last_end < len(text):
+        parts.append({"type": "text", "text": {"content": text[last_end:]}})
+    return parts or [{"type": "text", "text": {"content": text}}]
+
+
+def _markdown_to_blocks(text):
+    """Turn our Claude-generated markdown (headers as **Text**, "- " bullets,
+    plain paragraphs) into real Notion blocks instead of flattening
+    everything into plain paragraphs with literal asterisks."""
     blocks = []
     for line in text.split("\n"):
         line = line.strip()
         if not line:
             continue
-        if line.startswith("- ") or line.startswith("* "):
+
+        header_match = _HEADER_LINE_RE.match(line)
+        if header_match:
+            blocks.append(
+                {
+                    "object": "block",
+                    "type": "heading_3",
+                    "heading_3": {"rich_text": [{"type": "text", "text": {"content": header_match.group(1)}}]},
+                }
+            )
+        elif line.startswith("- ") or line.startswith("* "):
             blocks.append(
                 {
                     "object": "block",
                     "type": "bulleted_list_item",
-                    "bulleted_list_item": {
-                        "rich_text": [{"type": "text", "text": {"content": line[2:].strip()}}]
-                    },
+                    "bulleted_list_item": {"rich_text": _inline_rich_text(line[2:].strip()[:2000])},
                 }
             )
         else:
@@ -78,10 +114,36 @@ def _text_blocks(text):
                 {
                     "object": "block",
                     "type": "paragraph",
-                    "paragraph": {"rich_text": [{"type": "text", "text": {"content": line[:2000]}}]},
+                    "paragraph": {"rich_text": _inline_rich_text(line[:2000])},
                 }
             )
     return blocks
+
+
+def _transcript_toggle(transcript):
+    """A collapsed toggle block holding the full transcript, so an hour-plus
+    meeting doesn't dominate the page — everyone sees Summary/Notes first
+    and opens the transcript only if they need it."""
+    # Notion caps rich_text content at 2000 chars per block; chunk long transcripts.
+    chunks = [
+        {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {"rich_text": [{"type": "text", "text": {"content": transcript[i : i + 1900]}}]},
+        }
+        for i in range(0, len(transcript), 1900)
+    ]
+    # Notion allows at most 100 children per block; trim if a transcript is extreme.
+    chunks = chunks[:100]
+
+    return {
+        "object": "block",
+        "type": "toggle",
+        "toggle": {
+            "rich_text": [{"type": "text", "text": {"content": "Transcript"}, "annotations": {"bold": True}}],
+            "children": chunks,
+        },
+    }
 
 
 def _heading(text):
@@ -109,22 +171,14 @@ def create_meeting_page(parent_id, parent_type, title, summary, notes, transcrip
 
     children = []
     children.append(_heading("Summary"))
-    children.extend(_text_blocks(summary))
+    children.extend(_markdown_to_blocks(summary))
     children.append(_heading("Notes"))
-    children.extend(_text_blocks(notes))
-    children.append(_heading("Transcript"))
-    # Notion caps rich_text content at 2000 chars per block; chunk long transcripts.
-    for i in range(0, len(transcript), 1900):
-        chunk = transcript[i : i + 1900]
-        children.append(
-            {
-                "object": "block",
-                "type": "paragraph",
-                "paragraph": {"rich_text": [{"type": "text", "text": {"content": chunk}}]},
-            }
-        )
+    children.extend(_markdown_to_blocks(notes))
+    children.append(_transcript_toggle(transcript))
 
-    # Notion allows at most 100 children per create-page call; trim if needed.
+    # Notion allows at most 100 top-level children per create-page call;
+    # trim if needed (the transcript itself doesn't count against this since
+    # its chunks live nested inside the single toggle block above).
     if len(children) > 100:
         children = children[:100]
 

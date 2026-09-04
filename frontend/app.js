@@ -4,6 +4,7 @@ const timerEl = document.getElementById("timer");
 const statusEl = document.getElementById("status");
 const emptyEl = document.getElementById("empty");
 const resultsEl = document.getElementById("results");
+const meetingTitleEl = document.getElementById("meetingTitle");
 const summaryContent = document.getElementById("summaryContent");
 const notesContent = document.getElementById("notesContent");
 const transcriptContent = document.getElementById("transcriptContent");
@@ -151,10 +152,15 @@ async function generateSummary(transcriptText) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Summarization failed");
 
+    lastResult.title = data.title;
     lastResult.summary = data.summary;
     lastResult.notes = data.notes;
     summaryContent.textContent = data.summary;
     notesContent.textContent = data.notes;
+    if (data.title) {
+      meetingTitleEl.textContent = data.title;
+      meetingTitleEl.hidden = false;
+    }
     switchTab("summary");
     setStatus("");
     loadNotionPages();
@@ -203,6 +209,7 @@ fileBtn.addEventListener("click", async () => {
       body: JSON.stringify({
         parent_id: notionSelect.value,
         parent_type: selectedOption ? selectedOption.dataset.type : "page",
+        title: lastResult.title,
         summary: lastResult.summary,
         notes: lastResult.notes,
         transcript: lastResult.text,
