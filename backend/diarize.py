@@ -54,6 +54,29 @@ def _load_audio_mono(file_path):
     return audio, sample_rate
 
 
+def _embed_clip(audio, sample_rate, start, end):
+    """Embed one segment's audio clip, or None if it's too short to embed
+    reliably."""
+    clip = audio[int(start * sample_rate) : int(end * sample_rate)]
+    if len(clip) < sample_rate * MIN_SEGMENT_SECONDS:
+        return None
+    tensor = torch.from_numpy(clip).unsqueeze(0)
+    with torch.no_grad():
+        return get_model().encode_batch(tensor).squeeze().cpu().numpy()
+
+
+def _cosine_distance(a, b):
+    denom = np.linalg.norm(a) * np.linalg.norm(b)
+    if denom == 0:
+        return 1.0
+    return 1.0 - float(np.dot(a, b) / denom)
+
+
+def _rms(audio, sample_rate, start, end):
+    clip = audio[int(start * sample_rate) : int(end * sample_rate)]
+    return float(np.sqrt(np.mean(clip**2))) if len(clip) else 0.0
+
+
 def _embed_and_cluster(audio, sample_rate, segments, indices):
     """Cluster the given subset of segment indices by speaker embedding.
     Returns {index: local_cluster_id} (0-based, only meaningful within this
@@ -62,21 +85,14 @@ def _embed_and_cluster(audio, sample_rate, segments, indices):
     if not indices:
         return {}
 
-    model = get_model()
     embeddings = []
     embedded_indices = []
     for i in indices:
         seg = segments[i]
-        start_sample = int(seg["start"] * sample_rate)
-        end_sample = int(seg["end"] * sample_rate)
-        clip = audio[start_sample:end_sample]
-        if len(clip) < sample_rate * MIN_SEGMENT_SECONDS:
-            continue
-        tensor = torch.from_numpy(clip).unsqueeze(0)
-        with torch.no_grad():
-            embedding = model.encode_batch(tensor).squeeze().cpu().numpy()
-        embeddings.append(embedding)
-        embedded_indices.append(i)
+        emb = _embed_clip(audio, sample_rate, seg["start"], seg["end"])
+        if emb is not None:
+            embeddings.append(emb)
+            embedded_indices.append(i)
 
     if not embedded_indices:
         return {i: 0 for i in indices}
@@ -103,6 +119,19 @@ def _embed_and_cluster(audio, sample_rate, segments, indices):
     return result
 
 
+def _cluster_centroids(audio, sample_rate, segments, indices, labels):
+    """Mean embedding per cluster label, for matching other audio against
+    these voices later."""
+    buckets = {}
+    for i in indices:
+        seg = segments[i]
+        emb = _embed_clip(audio, sample_rate, seg["start"], seg["end"])
+        if emb is None:
+            continue
+        buckets.setdefault(labels[i], []).append(emb)
+    return {label: np.mean(embs, axis=0) for label, embs in buckets.items()}
+
+
 def diarize_segments(file_path, segments):
     """Assign a speaker label to each Whisper segment by clustering speaker
     embeddings (SpeechBrain's ECAPA-TDNN model — openly downloadable, no
@@ -127,14 +156,20 @@ def diarize_segments(file_path, segments):
 def diarize_with_source_separation(mic_path, system_path, segments):
     """Like diarize_segments, but uses two separate reference recordings —
     mic-only and system-audio-only, captured in parallel with the main
-    mixed recording — to determine each segment's source directly by which
-    track is louder at that moment, instead of relying purely on
-    voice-embedding similarity. Pure similarity struggles when two voices
-    happen to sound alike (e.g. mistaking a video's narrator for the user).
+    mixed recording — to tell the user's voice apart from everyone else's,
+    without assuming who talks first (not reliable — the user might not be
+    the one who speaks first) and without relying purely on which track is
+    louder (not reliable either — if the user has speakers rather than
+    headphones, other people's audio is audible in the room and bleeds
+    acoustically into the mic, which can outweigh the user's own voice).
 
-    The largest mic-side voice cluster is labeled "You"; every other
-    distinct voice (an extra voice sharing the mic, or any number of voices
-    coming through system audio) gets a normal "Speaker N" label, numbered
+    Key insight: system audio can only ever contain *other* people's voices
+    — the user's own live mic input is never routed back out through their
+    speakers. So system-audio segments are trustworthy "known not-you"
+    voiceprints. Any mic-side segment whose voice actually matches one of
+    those is leaked room audio, not really the user, and gets reclassified
+    to that speaker instead. Whatever's left on the mic side is the user —
+    labeled "You"; everyone else gets a normal "Speaker N" label, numbered
     in order of first appearance. Mutates and returns `segments`.
     """
     if not segments:
@@ -143,19 +178,38 @@ def diarize_with_source_separation(mic_path, system_path, segments):
     mic_audio, mic_sr = _load_audio_mono(mic_path)
     sys_audio, sys_sr = _load_audio_mono(system_path)
 
-    def rms(audio, sr, start, end):
-        clip = audio[int(start * sr) : int(end * sr)]
-        return float(np.sqrt(np.mean(clip**2))) if len(clip) else 0.0
-
     mic_indices, system_indices = [], []
     for i, seg in enumerate(segments):
-        mic_level = rms(mic_audio, mic_sr, seg["start"], seg["end"])
-        sys_level = rms(sys_audio, sys_sr, seg["start"], seg["end"])
+        mic_level = _rms(mic_audio, mic_sr, seg["start"], seg["end"])
+        sys_level = _rms(sys_audio, sys_sr, seg["start"], seg["end"])
         (mic_indices if mic_level >= sys_level else system_indices).append(i)
 
-    mic_labels = _embed_and_cluster(mic_audio, mic_sr, segments, mic_indices)
     system_labels = _embed_and_cluster(sys_audio, sys_sr, segments, system_indices)
+    system_centroids = _cluster_centroids(sys_audio, sys_sr, segments, system_indices, system_labels)
 
+    # Mic-side segments whose voice actually matches a known system-audio
+    # voice are leaked/bled-through audio, not the user — reclassify them
+    # to that speaker rather than lumping them in with the user's own voice.
+    true_mic_indices = []
+    reclassified = {}
+    for i in mic_indices:
+        seg = segments[i]
+        emb = _embed_clip(mic_audio, mic_sr, seg["start"], seg["end"])
+        if emb is None or not system_centroids:
+            true_mic_indices.append(i)
+            continue
+        best_label = min(system_centroids, key=lambda label: _cosine_distance(emb, system_centroids[label]))
+        if _cosine_distance(emb, system_centroids[best_label]) < CLUSTER_THRESHOLD:
+            reclassified[i] = best_label
+        else:
+            true_mic_indices.append(i)
+
+    mic_labels = _embed_and_cluster(mic_audio, mic_sr, segments, true_mic_indices)
+
+    # After removing leaked segments, whatever's left on the mic side should
+    # overwhelmingly be one consistent voice — the user's. If someone else
+    # is also genuinely sharing the mic (an in-person guest), that shows up
+    # as a second, smaller cluster here; the largest one is "You".
     you_cluster = None
     if mic_labels:
         counts = {}
@@ -166,7 +220,9 @@ def diarize_with_source_separation(mic_path, system_path, segments):
     speaker_names = {}
     next_number = 1
     for i in range(len(segments)):
-        if i in mic_labels:
+        if i in reclassified:
+            key = ("system", reclassified[i])
+        elif i in mic_labels:
             key = ("mic", mic_labels[i])
         else:
             key = ("system", system_labels.get(i, 0))
