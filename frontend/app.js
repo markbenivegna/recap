@@ -86,8 +86,10 @@ function startWaveform(stream) {
   // real browser tab does — so rAF can silently never run at all here, even
   // though the window is genuinely on screen. setInterval isn't gated by
   // that.
-  const barMultipliers = Array.from(waveformBars, () => 0.6 + Math.random() * 0.7);
+  const barMultipliers = Array.from(waveformBars, () => 0.7 + Math.random() * 0.6);
   const data = new Uint8Array(waveformAnalyser.fftSize);
+  const MIN_HEIGHT = 4;
+  const MAX_HEIGHT = 32;
   waveformTimer = setInterval(() => {
     waveformAnalyser.getByteTimeDomainData(data);
     let sumSquares = 0;
@@ -96,8 +98,14 @@ function startWaveform(stream) {
       sumSquares += v * v;
     }
     const rms = Math.sqrt(sumSquares / data.length);
+    // Normal conversational volume rarely pushes RMS anywhere near 1.0, so
+    // scaling linearly kept movement subtle even with real signal — sqrt
+    // boosts quieter/typical speech levels to make movement obvious rather
+    // than only reacting to shouting.
+    const level = Math.sqrt(rms);
     waveformBars.forEach((bar, i) => {
-      bar.style.height = `${Math.max(4, Math.min(24, rms * 90 * barMultipliers[i]))}px`;
+      const height = MIN_HEIGHT + level * (MAX_HEIGHT - MIN_HEIGHT) * barMultipliers[i];
+      bar.style.height = `${Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, height))}px`;
     });
   }, 60);
   waveformEl.hidden = false;

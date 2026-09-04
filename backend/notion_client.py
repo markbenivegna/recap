@@ -165,7 +165,7 @@ def _markdown_to_blocks(text):
     return blocks
 
 
-_SPEAKER_TURN_RE = re.compile(r"^(Speaker \d+): (.*)$", re.DOTALL)
+_SPEAKER_TURN_RE = re.compile(r"^(Speaker \d+|You): (.*)$", re.DOTALL)
 
 
 def _chunk_text(text, size=1900):
