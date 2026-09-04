@@ -98,8 +98,12 @@ h1 {
   gap: 12px;
 }
 
+/* Secondary button (their button.tsx colors.secondary): a neutral ring
+   (not a real border — a 1px box-shadow, so it never clashes with the
+   focus ring), hover only ever changes the fill, never the ring color. */
 .btn {
-  border: 1px solid var(--border);
+  border: none;
+  box-shadow: 0 0 0 1px var(--border), var(--shadow-xs);
   background: var(--panel);
   color: var(--text);
   padding: 10px 14px;
@@ -107,11 +111,10 @@ h1 {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: var(--shadow-xs);
-  transition: background-color 100ms linear, border-color 100ms linear, box-shadow 100ms linear;
+  transition: background-color 100ms linear, box-shadow 100ms linear;
 }
 
-.btn:hover { border-color: var(--accent); background: var(--hover-bg); }
+.btn:hover { background: var(--hover-bg); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn:focus-visible {
@@ -119,20 +122,21 @@ h1 {
   outline-offset: 2px;
 }
 
+/* Primary button (colors.primary): solid fill, no visible ring at all
+   (ring-transparent) — only the skeuomorphic inner highlight defines the
+   edge. Hover only darkens the fill. */
 .btn-record,
 .btn-primary {
-  background: var(--accent);
-  border-color: var(--accent-hover);
-  color: var(--accent-text);
-  /* Skeuomorphic inner highlight, matching Untitled UI's primary buttons */
+  border: none;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), var(--shadow-xs);
+  background: var(--accent);
+  color: var(--accent-text);
 }
 .btn-record:hover,
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 
 .btn-record.recording {
   background: #d92d20;
-  border-color: #d92d20;
   color: white;
 }
 
@@ -303,13 +307,13 @@ h1 {
 .file-bar select {
   padding: 8px 12px;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: none;
   background: var(--panel);
   color: var(--text);
   font-size: 14px;
   min-width: 240px;
-  box-shadow: var(--shadow-xs);
-  transition: box-shadow 100ms linear, border-color 100ms linear;
+  box-shadow: 0 0 0 1px var(--border), var(--shadow-xs);
+  transition: box-shadow 100ms linear;
 }
 
 .file-status {
@@ -317,8 +321,11 @@ h1 {
   color: var(--muted);
 }
 
+/* Utility icon button (their button-utility.tsx): smaller radius and much
+   tighter padding than a regular button — it's sized to just the icon. */
 .btn-icon {
-  padding: 10px;
+  padding: 6px;
+  border-radius: 6px;
   font-size: 16px;
   line-height: 1;
 }
@@ -396,13 +403,23 @@ h1 {
 .field input,
 .field select {
   width: 100%;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: none;
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
-  box-shadow: var(--shadow-xs);
+  box-shadow: 0 0 0 1px var(--border), var(--shadow-xs);
+  transition: box-shadow 100ms linear;
+}
+
+/* Focus (their input.tsx isFocusWithin): the 1px neutral ring is
+   entirely replaced by a 2px accent ring — not layered on top of it. */
+.field input:focus,
+.field select:focus,
+.file-bar select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-hover);
 }
 
 .modal-actions {
