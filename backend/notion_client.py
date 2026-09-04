@@ -46,8 +46,22 @@ def list_pages():
     resp.raise_for_status()
     results = resp.json().get("results", [])
 
+    # A page's own `parent` is almost never actually the workspace root —
+    # the pages a user shares with the integration (e.g. "Meetings") are
+    # typically themselves nested under other pages in their own private
+    # structure, which the integration can't see at all. So "top-level"
+    # here doesn't mean "parented directly by the workspace" — it means
+    # "not a child of another page/database we can also see", i.e. not one
+    # of the individual meeting pages this app already filed underneath a
+    # page the user picked as a destination.
+    visible_ids = {obj["id"] for obj in results}
+
     pages = []
     for obj in results:
+        parent = obj.get("parent", {})
+        parent_id = parent.get("page_id") or parent.get("database_id")
+        if parent_id in visible_ids:
+            continue
         pages.append(
             {
                 "id": obj["id"],
