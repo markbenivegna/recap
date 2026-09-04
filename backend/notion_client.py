@@ -85,8 +85,11 @@ def _inline_rich_text(text):
 def _markdown_to_blocks(text):
     """Turn our Claude-generated markdown (headers as **Text**, "- " bullets,
     plain paragraphs) into real Notion blocks instead of flattening
-    everything into plain paragraphs with literal asterisks."""
+    everything into plain paragraphs with literal asterisks. Bullets under
+    an "Action Items" header become checkable to_do blocks instead of plain
+    bullets, since they're actionable rather than just informational."""
     blocks = []
+    current_section = None
     for line in text.split("\n"):
         line = line.strip()
         if not line:
@@ -94,6 +97,7 @@ def _markdown_to_blocks(text):
 
         header_match = _HEADER_LINE_RE.match(line)
         if header_match:
+            current_section = header_match.group(1).strip().lower()
             blocks.append(
                 {
                     "object": "block",
@@ -102,13 +106,23 @@ def _markdown_to_blocks(text):
                 }
             )
         elif line.startswith("- ") or line.startswith("* "):
-            blocks.append(
-                {
-                    "object": "block",
-                    "type": "bulleted_list_item",
-                    "bulleted_list_item": {"rich_text": _inline_rich_text(line[2:].strip()[:2000])},
-                }
-            )
+            rich_text = _inline_rich_text(line[2:].strip()[:2000])
+            if current_section == "action items":
+                blocks.append(
+                    {
+                        "object": "block",
+                        "type": "to_do",
+                        "to_do": {"rich_text": rich_text, "checked": False},
+                    }
+                )
+            else:
+                blocks.append(
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {"rich_text": rich_text},
+                    }
+                )
         else:
             blocks.append(
                 {
@@ -140,7 +154,7 @@ def _transcript_toggle(transcript):
         "object": "block",
         "type": "toggle",
         "toggle": {
-            "rich_text": [{"type": "text", "text": {"content": "Transcript"}, "annotations": {"bold": True}}],
+            "rich_text": [{"type": "text", "text": {"content": "Click to expand"}}],
             "children": chunks,
         },
     }
@@ -174,6 +188,7 @@ def create_meeting_page(parent_id, parent_type, title, summary, notes, transcrip
     children.extend(_markdown_to_blocks(summary))
     children.append(_heading("Notes"))
     children.extend(_markdown_to_blocks(notes))
+    children.append(_heading("Transcript"))
     children.append(_transcript_toggle(transcript))
 
     # Notion allows at most 100 top-level children per create-page call;
