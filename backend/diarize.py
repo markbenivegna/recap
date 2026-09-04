@@ -1,4 +1,7 @@
+import contextlib
 import os
+import subprocess
+import tempfile
 
 import numpy as np
 import soundfile as sf
@@ -24,6 +27,33 @@ def get_model():
     return _model
 
 
+def _load_audio_mono(file_path):
+    """Read an audio file as a mono float32 array + sample rate. `soundfile`
+    (libsndfile) can't decode WebM/Opus — what the browser's MediaRecorder
+    actually produces — so this transparently falls back to converting via
+    ffmpeg to a temp WAV first for anything soundfile can't open directly.
+    """
+    try:
+        audio, sample_rate = sf.read(file_path, dtype="float32")
+    except Exception:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            wav_path = tmp.name
+        try:
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", file_path, "-ar", "16000", "-ac", "1", wav_path],
+                check=True,
+                capture_output=True,
+            )
+            audio, sample_rate = sf.read(wav_path, dtype="float32")
+        finally:
+            with contextlib.suppress(OSError):
+                os.remove(wav_path)
+
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
+    return audio, sample_rate
+
+
 def diarize_segments(file_path, segments):
     """Assign a speaker label to each Whisper segment by clustering speaker
     embeddings (SpeechBrain's ECAPA-TDNN model — openly downloadable, no
@@ -36,9 +66,7 @@ def diarize_segments(file_path, segments):
     if not segments:
         return segments
 
-    audio, sample_rate = sf.read(file_path, dtype="float32")
-    if audio.ndim > 1:
-        audio = audio.mean(axis=1)
+    audio, sample_rate = _load_audio_mono(file_path)
 
     model = get_model()
 
