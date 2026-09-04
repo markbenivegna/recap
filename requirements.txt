@@ -1,6 +1,6 @@
 flask==3.0.3
 faster-whisper==1.0.3
 python-dotenv==1.0.1
-anthropic==0.34.2
+anthropic>=0.125.0
 requests==2.32.3
 pywebview==5.3.2
