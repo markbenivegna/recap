@@ -1,11 +1,30 @@
 #!/bin/bash
 # Rebuilds the "Meeting Notes.app" launcher bundle in ~/Applications.
-# Run this again after moving the project folder, or if you regenerate the
-# icon (assets/generate_icon.py) and want the new artwork picked up.
+# Run this again after moving the project folder, recreating the venv, or
+# regenerating the icon (assets/generate_icon.py) and wanting new artwork.
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="$HOME/Applications/Meeting Notes.app"
+VENV_PYTHON="$PROJECT_DIR/venv/bin/python3"
+
+if [ ! -x "$VENV_PYTHON" ]; then
+    echo "No venv found at $PROJECT_DIR/venv — run the setup steps in README.md first." >&2
+    exit 1
+fi
+
+SITE_PACKAGES="$(cd "$PROJECT_DIR" && "$VENV_PYTHON" -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")"
+
+# Resolve the real framework interpreter behind the venv's python3 symlink,
+# e.g. /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9
+FRAMEWORK_PYTHON_BIN="$(cd "$PROJECT_DIR" && "$VENV_PYTHON" -c "import os; print(os.path.realpath('$VENV_PYTHON'))")"
+FRAMEWORK_VERSION_DIR="$(dirname "$(dirname "$FRAMEWORK_PYTHON_BIN")")"
+SOURCE_BINARY="$FRAMEWORK_VERSION_DIR/Resources/Python.app/Contents/MacOS/Python"
+
+if [ ! -f "$SOURCE_BINARY" ]; then
+    echo "Could not find the framework Python binary at $SOURCE_BINARY" >&2
+    exit 1
+fi
 
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
@@ -63,28 +82,51 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+# --- Embed a native arm64 copy of the interpreter inside our own bundle ---
+# This is what lets macOS attribute the microphone permission prompt to
+# "Meeting Notes" at all: TCC resolves privacy-prompt ownership from the
+# actual running executable's on-disk path. Running the system's shared
+# Python.app binary directly (the old approach) meant that path resolved to
+# CommandLineTools' own Python.app bundle, which declares no
+# NSMicrophoneUsageDescription — so macOS silently denied mic access with
+# no prompt and no entry in System Settings at all. Copying (and thinning
+# to arm64-only, which also permanently rules out the earlier
+# Rosetta-translation bug) makes the running binary's path resolve to our
+# own bundle instead, whose Info.plist above does declare it.
+RUNTIME="$APP_DIR/Contents/MacOS/PythonRuntime"
+cp "$SOURCE_BINARY" "$RUNTIME"
+if lipo -info "$RUNTIME" 2>/dev/null | grep -q "Architectures in the fat file"; then
+    lipo -thin arm64 "$RUNTIME" -output "$RUNTIME.thin"
+    mv "$RUNTIME.thin" "$RUNTIME"
+fi
+# Re-point the runtime at the real framework's dylib (it's not bundled here).
+install_name_tool -change "@executable_path/../../../../Python3" "$FRAMEWORK_VERSION_DIR/Python3" "$RUNTIME"
+codesign -s - -f "$RUNTIME"
+chmod +x "$RUNTIME"
+
 # --- Launcher ---
 cat > "$APP_DIR/Contents/MacOS/MeetingNotes" <<LAUNCHER
 #!/bin/bash
-# Launcher for the Meeting Notes app bundle. Runs the real project's
-# venv + main.py so the .app just needs to stay a thin pointer to it.
+# Launcher for the Meeting Notes app bundle. Runs the embedded interpreter
+# (Contents/MacOS/PythonRuntime) against the real project's venv packages,
+# so the .app stays a thin pointer to the actual project on disk.
 
 PROJECT_DIR="$PROJECT_DIR"
-PYTHON="\$PROJECT_DIR/venv/bin/python3"
+RUNTIME="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)/PythonRuntime"
 LOG_FILE="\$PROJECT_DIR/meeting-notes.log"
 
-if [ ! -x "\$PYTHON" ]; then
+if [ ! -x "\$RUNTIME" ] || [ ! -d "\$PROJECT_DIR/venv" ]; then
     osascript -e 'display alert "Meeting Notes" message "Setup is missing (no venv found at '"\$PROJECT_DIR"'). Run the setup steps in README.md first." as critical'
     exit 1
 fi
 
 cd "\$PROJECT_DIR" || exit 1
 
-# Finder/LaunchServices can launch this script under Rosetta translation on
-# Apple Silicon, which crashes on this venv's arm64-only wheels. `uname -m`
-# can't detect that case (it reports x86_64 while translated), so force
-# native arm64 unconditionally instead of trying to detect and branch.
-arch -arm64 "\$PYTHON" main.py >> "\$LOG_FILE" 2>&1
+export PYTHONHOME="$FRAMEWORK_VERSION_DIR"
+export PYTHONPATH="$SITE_PACKAGES"
+export PYTHONUNBUFFERED=1
+
+"\$RUNTIME" "\$PROJECT_DIR/main.py" >> "\$LOG_FILE" 2>&1
 STATUS=\$?
 
 # Closing the window terminates the process via a signal (exit code 143,

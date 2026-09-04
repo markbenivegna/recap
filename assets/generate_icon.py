@@ -83,16 +83,26 @@ def draw_waveform(draw, cx, cy, scale):
 
 
 def main():
-    bg = gradient_background(SIZE, BG_TOP, BG_BOTTOM)
-    mask = squircle_mask(SIZE)
+    # macOS app icons sit on a 1024x1024 canvas but the visible glyph should
+    # only fill ~80% of it (matching Apple's icon grid) with transparent
+    # margin around it — otherwise the tile reads as oversized next to
+    # other app icons in the Dock/Finder.
+    content_size = round(SIZE * 0.80)
+
+    bg = gradient_background(content_size, BG_TOP, BG_BOTTOM)
+    mask = squircle_mask(content_size)
+
+    content = Image.new("RGBA", (content_size, content_size), (0, 0, 0, 0))
+    content.paste(bg, (0, 0), mask)
+
+    draw = ImageDraw.Draw(content)
+    scale = content_size / 1024
+    draw_mic_glyph(draw, content_size / 2, content_size * 0.40, scale)
+    draw_waveform(draw, content_size / 2, content_size * 0.775, scale)
 
     canvas = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    canvas.paste(bg, (0, 0), mask)
-
-    draw = ImageDraw.Draw(canvas)
-    scale = SIZE / 1024
-    draw_mic_glyph(draw, SIZE / 2, SIZE * 0.40, scale)
-    draw_waveform(draw, SIZE / 2, SIZE * 0.775, scale)
+    offset = (SIZE - content_size) // 2
+    canvas.paste(content, (offset, offset), content)
 
     canvas.save(OUT_PATH)
     print(f"Wrote {OUT_PATH}")
