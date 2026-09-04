@@ -74,6 +74,26 @@ your mic when you hit Record — no extra steps in the app itself. If BlackHole
 isn't installed or isn't wired up yet, it just falls back to mic-only, same
 as before.
 
+### Auto-switching to the recording device
+
+If you don't want your Multi-Output Device as your everyday sound output
+(most people don't — it complicates normal volume control), the app can
+switch your system output to it automatically only while recording, and
+switch back to whatever you were using right after you hit Stop:
+
+1. Install the audio-switching CLI tool:
+   ```bash
+   brew install switchaudio-osx
+   ```
+2. Set `RECORDING_OUTPUT_DEVICE` in `.env` to the exact name of your
+   Multi-Output Device (as it appears in Audio MIDI Setup / System Settings
+   → Sound) — rename it there to something memorable if you want.
+
+With that set, hitting Record switches your output to that device, and
+Stop switches back to whatever was active before. If the tool isn't
+installed or the device name doesn't match anything currently available,
+this step is silently skipped and nothing about recording itself changes.
+
 If your speakers are connected over Bluetooth, macOS's Multi-Output Device
 handling of Bluetooth output is unreliable (a known OS-level limitation, not
 something this app or BlackHole can work around) — if you get silence after

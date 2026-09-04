@@ -7,10 +7,12 @@ from flask import Flask, jsonify, request, send_from_directory
 
 load_dotenv()
 
-from backend import notion_client
+from backend import audio_switch, notion_client
 from backend.diarize import diarize_segments, format_transcript_with_speakers
 from backend.summarize import summarize_transcript
 from backend.transcribe import transcribe_audio
+
+RECORDING_OUTPUT_DEVICE = os.environ.get("RECORDING_OUTPUT_DEVICE", "")
 
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
 RECORDINGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "recordings")
@@ -64,6 +66,18 @@ def api_summarize():
         return jsonify(result)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/audio/prepare-recording", methods=["POST"])
+def api_audio_prepare_recording():
+    switched = audio_switch.prepare_for_recording(RECORDING_OUTPUT_DEVICE)
+    return jsonify({"switched": switched})
+
+
+@app.route("/api/audio/restore", methods=["POST"])
+def api_audio_restore():
+    switched = audio_switch.restore_previous_output()
+    return jsonify({"switched": switched})
 
 
 @app.route("/api/notion/pages", methods=["GET"])

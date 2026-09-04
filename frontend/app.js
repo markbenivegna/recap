@@ -65,6 +65,16 @@ async function findBlackHoleDeviceId() {
 
 async function startRecording() {
   try {
+    // Switch system audio output to the recording device (e.g. a
+    // Multi-Output Device combining your speakers + BlackHole) before
+    // grabbing the mic, so BlackHole is actually receiving audio by the
+    // time we try to read from it below. No-ops quietly if not configured.
+    try {
+      await fetch("/api/audio/prepare-recording", { method: "POST" });
+    } catch (err) {
+      // Non-fatal — recording still works, just without the auto-switch.
+    }
+
     const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     activeStreams = [micStream];
 
@@ -106,6 +116,7 @@ async function startRecording() {
         audioCtx.close();
         audioCtx = null;
       }
+      fetch("/api/audio/restore", { method: "POST" }).catch(() => {});
       const blob = new Blob(recordedChunks, { type: "audio/webm" });
       handleAudioBlob(blob, "recording.webm");
     };
