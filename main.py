@@ -34,6 +34,46 @@ def run_flask(port):
     app.run(host=HOST, port=port, debug=False, use_reloader=False)
 
 
+def patch_mic_permission_passthrough():
+    # pywebview's Cocoa backend doesn't implement the WKUIDelegate method for
+    # media capture permission, so WKWebView falls back to its own default
+    # per-origin prompt ("Allow 127.0.0.1 to use your microphone?") on every
+    # single launch — even once macOS's own system permission (visible in
+    # System Settings > Privacy & Security > Microphone) is already granted
+    # and stays granted. They're two independent layers: the OS-level TCC
+    # grant, and WebKit's own per-origin site-permission memory. Add the
+    # missing delegate method so that once the OS has actually authorized
+    # the app, WebKit grants immediately instead of asking again.
+    try:
+        import WebKit
+        from AVFoundation import AVCaptureDevice, AVMediaTypeAudio
+        from webview.platforms.cocoa import BrowserView
+
+        BrowserDelegate = BrowserView.BrowserDelegate
+        pyobjc_method_signature = BrowserView.pyobjc_method_signature
+
+        def webView_requestMediaCapturePermissionForOrigin_initiatedByFrame_type_decisionHandler_(
+            self, webview_, origin, frame, media_type, handler
+        ):
+            if not handler.__block_signature__:
+                handler.__block_signature__ = pyobjc_method_signature(b'v@i')
+
+            status = AVCaptureDevice.authorizationStatusForMediaType_(AVMediaTypeAudio)
+            if status == 3:  # AVAuthorizationStatusAuthorized
+                decision = getattr(WebKit, 'WKPermissionDecisionGrant', 1)
+            elif status in (1, 2):  # Restricted, Denied
+                decision = getattr(WebKit, 'WKPermissionDecisionDeny', 2)
+            else:  # NotDetermined — let the normal first-time flow happen
+                decision = getattr(WebKit, 'WKPermissionDecisionPrompt', 0)
+            handler(decision)
+
+        BrowserDelegate.webView_requestMediaCapturePermissionForOrigin_initiatedByFrame_type_decisionHandler_ = (
+            webView_requestMediaCapturePermissionForOrigin_initiatedByFrame_type_decisionHandler_
+        )
+    except Exception as exc:
+        print(f"Could not patch mic permission passthrough: {exc}")
+
+
 def apply_mac_dock_branding():
     # We launch via the system's Python.app framework binary rather than a
     # compiled app bundle of our own, so macOS otherwise shows the Dock
@@ -60,5 +100,6 @@ if __name__ == "__main__":
     flask_thread.start()
 
     webview.create_window(APP_NAME, f"http://{HOST}:{port}", width=1000, height=800, min_size=(700, 600))
+    patch_mic_permission_passthrough()
     apply_mac_dock_branding()
     webview.start()
