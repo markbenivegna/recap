@@ -50,16 +50,62 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => switchTab(btn.dataset.tab));
 });
 
+let activeStreams = [];
+let audioCtx = null;
+
+async function findBlackHoleDeviceId() {
+  // Device labels are blank until a getUserMedia call has been granted at
+  // least once, so this must run after the mic permission is already live.
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const match = devices.find(
+    (d) => d.kind === "audioinput" && /blackhole/i.test(d.label)
+  );
+  return match ? match.deviceId : null;
+}
+
 async function startRecording() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    activeStreams = [micStream];
+
+    let usingSystemAudio = false;
+    const blackHoleId = await findBlackHoleDeviceId();
+    let mixedStream = micStream;
+
+    if (blackHoleId) {
+      try {
+        const systemStream = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: { exact: blackHoleId } },
+        });
+        activeStreams.push(systemStream);
+
+        // Mix mic + system audio (BlackHole) into a single stream so the
+        // recording captures both sides of a call, not just your voice.
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const dest = audioCtx.createMediaStreamDestination();
+        audioCtx.createMediaStreamSource(micStream).connect(dest);
+        audioCtx.createMediaStreamSource(systemStream).connect(dest);
+        mixedStream = dest.stream;
+        usingSystemAudio = true;
+      } catch (err) {
+        // BlackHole device exists but couldn't be opened (e.g. not set as
+        // part of a Multi-Output Device yet) — fall back to mic-only.
+        mixedStream = micStream;
+      }
+    }
+
     recordedChunks = [];
-    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder = new MediaRecorder(mixedStream);
     mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) recordedChunks.push(e.data);
     };
     mediaRecorder.onstop = () => {
-      stream.getTracks().forEach((track) => track.stop());
+      activeStreams.forEach((s) => s.getTracks().forEach((track) => track.stop()));
+      activeStreams = [];
+      if (audioCtx) {
+        audioCtx.close();
+        audioCtx = null;
+      }
       const blob = new Blob(recordedChunks, { type: "audio/webm" });
       handleAudioBlob(blob, "recording.webm");
     };
@@ -72,7 +118,7 @@ async function startRecording() {
     timerInterval = setInterval(() => {
       timerEl.textContent = formatTimer(Date.now() - recordingStart);
     }, 250);
-    setStatus("Recording...");
+    setStatus(usingSystemAudio ? "Recording (mic + system audio)..." : "Recording...");
   } catch (err) {
     setStatus(`Could not access microphone: ${err.message}`, true);
   }

@@ -56,3 +56,20 @@ If you ever move the project folder, or want to regenerate the icon, re-run `./s
 - Recordings are transcribed then deleted from disk immediately after.
 - Only pages/databases explicitly shared with your Notion integration show up in the dropdown.
 - `WHISPER_MODEL_SIZE` in `.env` controls the local model (`small` by default; try `medium` for better accuracy or `base` for more speed).
+
+## System audio (hearing both sides of a call)
+
+By default, Record only captures your microphone. To also capture whatever's
+playing out of your speakers (e.g. the other person on a Zoom/Meet call):
+
+1. Install [BlackHole](https://github.com/ExistentialAudio/BlackHole), a free virtual audio driver:
+   ```bash
+   brew install blackhole-2ch
+   ```
+2. Open **Audio MIDI Setup** (Applications → Utilities), click `+` → **Create Multi-Output Device**, and check both your normal speakers and "BlackHole 2ch".
+3. Set that Multi-Output Device as your system sound output (System Settings → Sound, or the menu bar volume icon).
+
+Once that's set up, the app automatically detects BlackHole and mixes it with
+your mic when you hit Record — no extra steps in the app itself. If BlackHole
+isn't installed or isn't wired up yet, it just falls back to mic-only, same
+as before.
