@@ -188,7 +188,7 @@ h1 {
 }
 
 .tab-btn.active {
-  color: var(--accent-hover);
+  color: var(--text);
   border-bottom-color: var(--accent);
 }
 
