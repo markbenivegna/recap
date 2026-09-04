@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Meeting Notes</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+  <header class="toolbar">
+    <h1>Meeting Notes</h1>
+    <div class="record-controls">
+      <button id="recordBtn" class="btn btn-record">Record</button>
+      <span id="timer" class="timer" hidden>00:00</span>
+      <label class="btn btn-secondary file-label">
+        Upload audio
+        <input id="fileInput" type="file" accept="audio/*" hidden />
+      </label>
+    </div>
+  </header>
+
+  <div id="status" class="status" hidden></div>
+
+  <main class="content">
+    <div id="empty" class="empty-state">
+      Record a meeting or upload an audio file to get started.
+    </div>
+
+    <div id="results" hidden>
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="summary">Summary</button>
+        <button class="tab-btn" data-tab="notes">Notes</button>
+        <button class="tab-btn" data-tab="transcript">Transcript</button>
+      </nav>
+
+      <section id="tab-summary" class="tab-panel active">
+        <div id="summaryContent" class="panel-content"></div>
+      </section>
+
+      <section id="tab-notes" class="tab-panel">
+        <div id="notesContent" class="panel-content"></div>
+      </section>
+
+      <section id="tab-transcript" class="tab-panel">
+        <div id="transcriptContent" class="panel-content transcript"></div>
+      </section>
+
+      <footer class="file-bar">
+        <label for="notionSelect">File to Notion:</label>
+        <select id="notionSelect">
+          <option value="">Loading pages...</option>
+        </select>
+        <button id="fileBtn" class="btn btn-primary" disabled>File to Notion</button>
+        <span id="fileStatus" class="file-status"></span>
+      </footer>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

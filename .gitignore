@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+.env
+recordings/*
+!recordings/.gitkeep
+.DS_Store
