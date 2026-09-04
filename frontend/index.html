@@ -11,6 +11,13 @@
   <header class="toolbar">
     <h1>Meeting Notes</h1>
     <div class="record-controls">
+      <div id="waveform" class="waveform" hidden>
+        <span class="waveform-bar"></span>
+        <span class="waveform-bar"></span>
+        <span class="waveform-bar"></span>
+        <span class="waveform-bar"></span>
+        <span class="waveform-bar"></span>
+      </div>
       <button id="recordBtn" class="btn btn-record">Record</button>
       <span id="timer" class="timer" hidden>00:00</span>
       <label class="btn btn-secondary file-label">
@@ -20,7 +27,10 @@
     </div>
   </header>
 
-  <div id="status" class="status" hidden></div>
+  <div id="status" class="status" hidden>
+    <span id="statusSpinner" class="spinner" hidden></span>
+    <span id="statusText"></span>
+  </div>
 
   <main class="content">
     <div id="empty" class="empty-state">
@@ -53,6 +63,7 @@
           <option value="">Loading pages...</option>
         </select>
         <button id="fileBtn" class="btn btn-primary" disabled>File to Notion</button>
+        <button id="downloadBtn" class="btn btn-secondary">Save Markdown</button>
         <span id="fileStatus" class="file-status"></span>
       </footer>
     </div>

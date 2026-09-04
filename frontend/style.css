@@ -102,6 +102,9 @@ h1 {
 }
 
 .status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 10px 14px;
   border-radius: 8px;
   background: var(--panel);
@@ -111,9 +114,46 @@ h1 {
   font-size: 14px;
 }
 
+.status[hidden] {
+  display: none;
+}
+
 .status.error {
   color: #b91c1c;
   border-color: #b91c1c;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.waveform {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+}
+
+.waveform[hidden] {
+  display: none;
+}
+
+.waveform-bar {
+  width: 3px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: height 60ms ease-out;
 }
 
 .empty-state {

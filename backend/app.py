@@ -2,17 +2,24 @@ import os
 import uuid
 from datetime import datetime
 
+import webview
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 
 load_dotenv()
 
-from backend import audio_switch, notion_client
+from backend import audio_switch, markdown_export, notion_client
 from backend.diarize import diarize_segments, format_transcript_with_speakers
 from backend.summarize import summarize_transcript
 from backend.transcribe import transcribe_audio
 
 RECORDING_OUTPUT_DEVICE = os.environ.get("RECORDING_OUTPUT_DEVICE", "")
+
+
+def _meeting_title(raw_title):
+    meeting_title = (raw_title or "").strip()
+    formatted_date = datetime.now().strftime("%-m/%-d/%Y at %-I:%M %p")
+    return f"{meeting_title} - {formatted_date}" if meeting_title else f"Meeting Notes - {formatted_date}"
 
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
 RECORDINGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "recordings")
@@ -97,9 +104,7 @@ def api_notion_file():
     summary = data.get("summary", "")
     notes = data.get("notes", "")
     transcript = data.get("transcript", "")
-    meeting_title = (data.get("title") or "").strip()
-    formatted_date = datetime.now().strftime("%-m/%-d/%Y at %-I:%M %p")
-    title = f"{meeting_title} - {formatted_date}" if meeting_title else f"Meeting Notes - {formatted_date}"
+    title = _meeting_title(data.get("title"))
 
     if not parent_id:
         return jsonify({"error": "parent_id is required"}), 400
@@ -107,6 +112,40 @@ def api_notion_file():
     try:
         result = notion_client.create_meeting_page(parent_id, parent_type, title, summary, notes, transcript)
         return jsonify(result)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/download-markdown", methods=["POST"])
+def api_download_markdown():
+    data = request.get_json(silent=True) or {}
+    summary = data.get("summary", "")
+    notes = data.get("notes", "")
+    transcript = data.get("transcript", "")
+    title = _meeting_title(data.get("title"))
+    suggested_name = markdown_export.safe_filename(title) + ".md"
+
+    try:
+        if webview.windows:
+            # Native "Save As" dialog — lets the user pick where it goes,
+            # same as any other desktop app, rather than a fixed folder.
+            result = webview.windows[0].create_file_dialog(
+                webview.SAVE_DIALOG,
+                directory=os.path.expanduser("~/Documents"),
+                save_filename=suggested_name,
+            )
+            if not result:
+                return jsonify({"cancelled": True})
+            path = result[0] if isinstance(result, (list, tuple)) else result
+        else:
+            # Plain web-app mode (no native window) has no save dialog
+            # available — fall back to a fixed, predictable local folder.
+            fallback_dir = os.path.expanduser("~/Documents/Meeting Notes")
+            os.makedirs(fallback_dir, exist_ok=True)
+            path = os.path.join(fallback_dir, suggested_name)
+
+        markdown_export.write_markdown(path, title, summary, notes, transcript)
+        return jsonify({"path": path})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 

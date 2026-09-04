@@ -1,7 +1,11 @@
 const recordBtn = document.getElementById("recordBtn");
 const fileInput = document.getElementById("fileInput");
 const timerEl = document.getElementById("timer");
+const waveformEl = document.getElementById("waveform");
+const waveformBars = waveformEl.querySelectorAll(".waveform-bar");
 const statusEl = document.getElementById("status");
+const statusTextEl = document.getElementById("statusText");
+const statusSpinnerEl = document.getElementById("statusSpinner");
 const emptyEl = document.getElementById("empty");
 const resultsEl = document.getElementById("results");
 const meetingTitleEl = document.getElementById("meetingTitle");
@@ -10,6 +14,7 @@ const notesContent = document.getElementById("notesContent");
 const transcriptContent = document.getElementById("transcriptContent");
 const notionSelect = document.getElementById("notionSelect");
 const fileBtn = document.getElementById("fileBtn");
+const downloadBtn = document.getElementById("downloadBtn");
 const fileStatus = document.getElementById("fileStatus");
 
 let mediaRecorder = null;
@@ -20,14 +25,15 @@ let recordingStart = null;
 
 let lastResult = null; // { summary, notes, text, segments }
 
-function setStatus(message, isError = false) {
+function setStatus(message, isError = false, showSpinner = false) {
   if (!message) {
     statusEl.hidden = true;
     return;
   }
   statusEl.hidden = false;
-  statusEl.textContent = message;
+  statusTextEl.textContent = message;
   statusEl.classList.toggle("error", isError);
+  statusSpinnerEl.hidden = !showSpinner;
 }
 
 function formatTimer(ms) {
@@ -52,6 +58,39 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
 
 let activeStreams = [];
 let audioCtx = null;
+let waveformAnalyser = null;
+let waveformRAF = null;
+
+function startWaveform(stream) {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  waveformAnalyser = audioCtx.createAnalyser();
+  waveformAnalyser.fftSize = 64;
+  audioCtx.createMediaStreamSource(stream).connect(waveformAnalyser);
+
+  const data = new Uint8Array(waveformAnalyser.frequencyBinCount);
+  const draw = () => {
+    waveformAnalyser.getByteFrequencyData(data);
+    waveformBars.forEach((bar, i) => {
+      const level = data[Math.floor((i / waveformBars.length) * data.length)] / 255;
+      bar.style.height = `${Math.max(4, level * 24)}px`;
+    });
+    waveformRAF = requestAnimationFrame(draw);
+  };
+  waveformEl.hidden = false;
+  draw();
+}
+
+function stopWaveform() {
+  if (waveformRAF) {
+    cancelAnimationFrame(waveformRAF);
+    waveformRAF = null;
+  }
+  waveformAnalyser = null;
+  waveformEl.hidden = true;
+  waveformBars.forEach((bar) => (bar.style.height = "4px"));
+}
 
 async function findBlackHoleDeviceId() {
   // Device labels are blank until a getUserMedia call has been granted at
@@ -129,6 +168,7 @@ async function startRecording() {
     timerInterval = setInterval(() => {
       timerEl.textContent = formatTimer(Date.now() - recordingStart);
     }, 250);
+    startWaveform(mixedStream);
     setStatus(usingSystemAudio ? "Recording (mic + system audio)..." : "Recording...");
   } catch (err) {
     setStatus(`Could not access microphone: ${err.message}`, true);
@@ -137,6 +177,7 @@ async function startRecording() {
 
 function stopRecording() {
   if (mediaRecorder && recording) {
+    stopWaveform();
     mediaRecorder.stop();
     recording = false;
     recordBtn.textContent = "Record";
@@ -165,7 +206,7 @@ fileInput.addEventListener("change", () => {
 async function handleAudioBlob(blob, filename) {
   emptyEl.hidden = true;
   resultsEl.hidden = false;
-  setStatus("Transcribing locally (this can take a minute)...");
+  setStatus("Transcribing locally (this can take a minute)...", false, true);
 
   const formData = new FormData();
   formData.append("audio", blob, filename);
@@ -176,7 +217,7 @@ async function handleAudioBlob(blob, filename) {
     if (!res.ok) throw new Error(data.error || "Transcription failed");
 
     renderTranscript(data);
-    setStatus("Transcript ready. Generating summary...");
+    setStatus("Transcript ready. Generating summary...", false, true);
     await generateSummary(data.text);
   } catch (err) {
     setStatus(`Error: ${err.message}`, true);
@@ -300,5 +341,30 @@ fileBtn.addEventListener("click", async () => {
   } catch (err) {
     fileStatus.textContent = `Error: ${err.message}`;
     fileBtn.disabled = false;
+  }
+});
+
+downloadBtn.addEventListener("click", async () => {
+  if (!lastResult) return;
+  downloadBtn.disabled = true;
+  fileStatus.textContent = "Choose where to save...";
+  try {
+    const res = await fetch("/api/download-markdown", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: lastResult.title,
+        summary: lastResult.summary,
+        notes: lastResult.notes,
+        transcript: lastResult.text,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Save failed");
+    fileStatus.textContent = data.cancelled ? "" : `Saved to ${data.path}`;
+  } catch (err) {
+    fileStatus.textContent = `Error: ${err.message}`;
+  } finally {
+    downloadBtn.disabled = false;
   }
 });
