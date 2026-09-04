@@ -10,9 +10,21 @@ SYSTEM_PROMPT = """You turn raw meeting transcripts into three things:
 discussed (e.g. "Q3 Roadmap Planning", "Client Onboarding Call: Acme Corp"). Not generic \
 ("Meeting Notes", "Team Sync") unless the transcript genuinely gives you nothing more specific.
 2. A concise summary — a few sentences describing what the meeting was about and the outcome.
-3. Structured notes — bullet points grouped under "Key Points", "Decisions", and "Action Items" \
-(use only the headings that apply; skip a heading if there's nothing for it). Format each group \
-heading as its own line wrapped in double asterisks, e.g. **Key Points**.
+3. Structured notes as markdown, organized like this:
+   - Start with an "**Action Items**" section (skip it entirely if there genuinely aren't any) — \
+this always comes first, before anything else.
+   - After that, break the rest of the discussion into your own topic-specific section headings, \
+named for what was actually discussed (e.g. "Budget Planning", "Hiring Timeline for Q3", "Client \
+Feedback on the V2 Design") — not generic labels like "Key Points" or "Decisions". Use as many \
+sections as make sense for how the conversation actually flowed; a short meeting might only need \
+one or two.
+   - Within a section, use a nested sub-bullet (indent it two extra spaces under its parent bullet) \
+when a point has supporting detail worth breaking out, e.g.:
+     - Main point
+       - Supporting detail
+       - Another supporting detail
+   - Format every section heading (including "Action Items") as its own line wrapped in double \
+asterisks, e.g. **Budget Planning**.
 
 The transcript's turns are labeled by voice, like "Speaker 1:" or "Speaker 2:" — these are \
 automatically detected voices, not necessarily correct or stable if a speaker is briefly silent. \

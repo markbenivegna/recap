@@ -83,21 +83,28 @@ def _inline_rich_text(text):
 
 
 def _markdown_to_blocks(text):
-    """Turn our Claude-generated markdown (headers as **Text**, "- " bullets,
-    plain paragraphs) into real Notion blocks instead of flattening
-    everything into plain paragraphs with literal asterisks. Bullets under
-    an "Action Items" header become checkable to_do blocks instead of plain
-    bullets, since they're actionable rather than just informational."""
+    """Turn our Claude-generated markdown into real Notion blocks instead of
+    flattening everything into plain paragraphs with literal asterisks.
+    Section headers (**Text**, on their own line) become heading_3 blocks —
+    Claude names these dynamically per meeting, except "Action Items" is
+    always the special case: its bullets become checkable to_do blocks
+    instead of plain bullets, since they're actionable, not just
+    informational. A bullet indented two extra spaces under another bullet
+    becomes a nested sub-bullet (a child of that parent block) rather than
+    another flat top-level item."""
     blocks = []
     current_section = None
-    for line in text.split("\n"):
-        line = line.strip()
-        if not line:
+    last_top_bullet = None
+    for raw_line in text.split("\n"):
+        if not raw_line.strip():
             continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        line = raw_line.strip()
 
         header_match = _HEADER_LINE_RE.match(line)
         if header_match:
             current_section = header_match.group(1).strip().lower()
+            last_top_bullet = None
             blocks.append(
                 {
                     "object": "block",
@@ -115,14 +122,23 @@ def _markdown_to_blocks(text):
                         "to_do": {"rich_text": rich_text, "checked": False},
                     }
                 )
-            else:
-                blocks.append(
+                last_top_bullet = None
+            elif indent >= 2 and last_top_bullet is not None:
+                last_top_bullet["bulleted_list_item"].setdefault("children", []).append(
                     {
                         "object": "block",
                         "type": "bulleted_list_item",
                         "bulleted_list_item": {"rich_text": rich_text},
                     }
                 )
+            else:
+                block = {
+                    "object": "block",
+                    "type": "bulleted_list_item",
+                    "bulleted_list_item": {"rich_text": rich_text},
+                }
+                blocks.append(block)
+                last_top_bullet = block
         else:
             blocks.append(
                 {
@@ -131,6 +147,7 @@ def _markdown_to_blocks(text):
                     "paragraph": {"rich_text": _inline_rich_text(line[:2000])},
                 }
             )
+            last_top_bullet = None
     return blocks
 
 
