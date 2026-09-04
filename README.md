@@ -6,29 +6,56 @@ Notion as a new page.
 
 ## Setup
 
+### 0. Prerequisites
+
+- **macOS**, Apple Silicon (arm64) — the build script embeds an arm64-only Python runtime inside the app.
+- **Python 3.9+** — macOS ships one at `/usr/bin/python3`, or install one via [Homebrew](https://brew.sh) (`brew install python3`).
+- **[Homebrew](https://brew.sh)**, for the one required system dependency below.
+- **ffmpeg**, used to decode recorded audio before diarization:
+  ```bash
+  brew install ffmpeg
+  ```
+  Without this, transcription of anything actually recorded through the app (as opposed to certain uploaded files) will fail silently at the diarization step.
+
+### 1. Clone and install Python dependencies
+
 ```bash
+git clone https://github.com/markbenivegna/recap.git
+cd recap
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+```
+
+(If you're already in the project folder, skip the `git clone`/`cd`.)
+
+### 2. Configure API keys
+
+```bash
 cp .env.example .env
 ```
 
-Edit `.env` and fill in:
+Open `.env` in any text editor and fill in:
 
-- `ANTHROPIC_API_KEY` — from [console.anthropic.com](https://console.anthropic.com) (pay-as-you-go, separate from a claude.ai subscription)
-- `NOTION_API_KEY` — create an internal integration at [notion.so/my-integrations](https://www.notion.so/my-integrations), then open each Notion page/database you want the app to see and share it with that integration (`... > Connections > Connect to`)
+- **`ANTHROPIC_API_KEY`** — go to [console.anthropic.com](https://console.anthropic.com), sign in (this is a separate pay-as-you-go account from a claude.ai subscription), open **API Keys** in the left sidebar, click **Create Key**, and paste the value in. A typical meeting (transcription + summarization) costs a few cents.
+- **`NOTION_API_KEY`** — go to [notion.so/my-integrations](https://www.notion.so/my-integrations), click **New integration**, give it any name (e.g. "Recap"), and create it. Copy the **Internal Integration Secret** it shows you into `.env`.
+  - **Then, separately**, in Notion itself: open every page or database you want to be able to file meeting notes into, click the **`...`** menu in the top right, go to **Connections**, and connect your new integration. Repeat for each page — pages not explicitly connected this way will never show up in the app's dropdown, even though the API key itself is valid.
 
-`faster-whisper` downloads its model automatically on first run and then works offline.
+Everything else in `.env` (`WHISPER_MODEL_SIZE`, `VOCABULARY_HINTS`, `DIARIZATION_THRESHOLD`, `RECORDING_OUTPUT_DEVICE`) has a working default — see the comments in `.env.example`, or the [System audio](#system-audio-hearing-both-sides-of-a-call) section below if you want to capture both sides of a call.
 
-Finally, build the double-clickable app:
+### 3. Build the app
 
 ```bash
 ./scripts/build_app.sh
 ```
 
-This creates **Recap.app** in `~/Applications` with a custom icon. Open it from Finder or Launchpad like any other app — no terminal needed after this point.
+This creates **Recap.app** in `~/Applications` with a custom icon — a one-time step that takes a minute or two. Open it from Finder or Launchpad from here on; no terminal needed after this point.
 
-The first launch may show an "unidentified developer" Gatekeeper warning since the app isn't code-signed; right-click the app and choose **Open** once to get past it.
+### 4. First launch
+
+- macOS will likely show an **"unidentified developer"** Gatekeeper warning, since the app isn't code-signed. Right-click (or Control-click) the app in Finder and choose **Open** once — you'll only need to do this the first time.
+- Clicking **Record** for the first time triggers a normal macOS microphone-permission prompt — click **Allow**.
+- The very first recording you transcribe will trigger a one-time download of the `faster-whisper` model (a few hundred MB for the default `small` size) and the speaker-diarization model (`speechbrain/spkrec-ecapa-voxceleb`, downloaded to `.cache/`) — expect that first transcription to take noticeably longer than later ones while those download. Everything after that runs fully offline.
 
 ## Run
 

@@ -50,6 +50,16 @@ if [ ! -f "$PROJECT_DIR/assets/AppIcon.icns" ]; then
 fi
 cp "$PROJECT_DIR/assets/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 
+# Compiled Icon Composer bundle (assets/AppIcon.icon), for macOS 26+'s Liquid
+# Glass icon rendering. Without this, Tahoe boxes up the plain .icns above
+# ("icon jail") instead of rendering it natively. Built via GitHub Actions
+# (actool requires full Xcode, not just the Command Line Tools) — see
+# .github/workflows/compile-icon.yml. Re-run that workflow and copy its
+# Assets.car output here if assets/AppIcon.icon ever changes.
+if [ -f "$PROJECT_DIR/assets/AppIcon.car" ]; then
+    cp "$PROJECT_DIR/assets/AppIcon.car" "$APP_DIR/Contents/Resources/Assets.car"
+fi
+
 # --- Info.plist ---
 cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -71,6 +81,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 	<key>CFBundleExecutable</key>
 	<string>Recap</string>
 	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
