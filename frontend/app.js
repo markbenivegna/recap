@@ -66,15 +66,27 @@ function startWaveform(stream) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
   waveformAnalyser = audioCtx.createAnalyser();
-  waveformAnalyser.fftSize = 64;
+  waveformAnalyser.fftSize = 256;
   audioCtx.createMediaStreamSource(stream).connect(waveformAnalyser);
 
-  const data = new Uint8Array(waveformAnalyser.frequencyBinCount);
+  // Frequency-bin-per-bar (the previous approach) meant most bars landed on
+  // higher-frequency bins where voice has almost no energy, so only the
+  // first bar (the low-frequency bin) ever visibly moved. Use one overall
+  // volume level (RMS of the time-domain signal) instead, applied to every
+  // bar with a small fixed per-bar multiplier for natural-looking variation
+  // — guarantees all bars react together to actual signal.
+  const barMultipliers = Array.from(waveformBars, () => 0.6 + Math.random() * 0.7);
+  const data = new Uint8Array(waveformAnalyser.fftSize);
   const draw = () => {
-    waveformAnalyser.getByteFrequencyData(data);
+    waveformAnalyser.getByteTimeDomainData(data);
+    let sumSquares = 0;
+    for (let i = 0; i < data.length; i++) {
+      const v = (data[i] - 128) / 128;
+      sumSquares += v * v;
+    }
+    const rms = Math.sqrt(sumSquares / data.length);
     waveformBars.forEach((bar, i) => {
-      const level = data[Math.floor((i / waveformBars.length) * data.length)] / 255;
-      bar.style.height = `${Math.max(4, level * 24)}px`;
+      bar.style.height = `${Math.max(4, Math.min(24, rms * 90 * barMultipliers[i]))}px`;
     });
     waveformRAF = requestAnimationFrame(draw);
   };
