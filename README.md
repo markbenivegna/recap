@@ -20,21 +20,29 @@ Edit `.env` and fill in:
 
 `faster-whisper` downloads its model automatically on first run and then works offline.
 
+Finally, build the double-clickable app:
+
+```bash
+./scripts/build_app.sh
+```
+
+This creates **Meeting Notes.app** in `~/Applications` with a custom icon. Open it from Finder or Launchpad like any other app — no terminal needed after this point.
+
+The first launch may show an "unidentified developer" Gatekeeper warning since the app isn't code-signed; right-click the app and choose **Open** once to get past it.
+
 ## Run
 
-As a plain web app (browser at http://127.0.0.1:5151):
+The normal way, day to day: open **Meeting Notes** from `~/Applications` (or Launchpad) like any other app.
+
+For debugging, you can also run it directly from a terminal:
 
 ```bash
 source venv/bin/activate
-python3 -m backend.app
+python3 main.py          # standalone window
+python3 -m backend.app   # or: plain web app at http://127.0.0.1:5151
 ```
 
-As a standalone desktop window (no browser chrome):
-
-```bash
-source venv/bin/activate
-python3 main.py
-```
+If you ever move the project folder, or want to regenerate the icon, re-run `./scripts/build_app.sh` to rebuild the app bundle.
 
 ## Flow
 

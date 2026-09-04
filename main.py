@@ -1,3 +1,5 @@
+import os
+import socket
 import threading
 
 import webview
@@ -5,16 +7,45 @@ import webview
 from backend.app import app
 
 HOST = "127.0.0.1"
-PORT = 5151
+APP_NAME = "Meeting Notes"
+ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png")
 
 
-def run_flask():
-    app.run(host=HOST, port=PORT, debug=False, use_reloader=False)
+def find_free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((HOST, 0))
+        return s.getsockname()[1]
+
+
+def run_flask(port):
+    app.run(host=HOST, port=port, debug=False, use_reloader=False)
+
+
+def apply_mac_dock_branding():
+    # We launch via the system's Python.app framework binary rather than a
+    # compiled app bundle of our own, so macOS otherwise shows the Dock
+    # icon/name for "Python" instead of this app. Override both at runtime.
+    try:
+        from AppKit import NSApplication, NSImage
+        from Foundation import NSBundle
+
+        icon = NSImage.alloc().initWithContentsOfFile_(ICON_PATH)
+        if icon is not None:
+            NSApplication.sharedApplication().setApplicationIconImage_(icon)
+
+        bundle = NSBundle.mainBundle()
+        info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
+        if info is not None:
+            info["CFBundleName"] = APP_NAME
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    port = find_free_port()
+    flask_thread = threading.Thread(target=run_flask, args=(port,), daemon=True)
     flask_thread.start()
 
-    webview.create_window("Meeting Notes", f"http://{HOST}:{PORT}", width=1000, height=800, min_size=(700, 600))
+    webview.create_window(APP_NAME, f"http://{HOST}:{port}", width=1000, height=800, min_size=(700, 600))
+    apply_mac_dock_branding()
     webview.start()
