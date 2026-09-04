@@ -90,21 +90,47 @@ function startWaveform(stream) {
   const data = new Uint8Array(waveformAnalyser.fftSize);
   const MIN_HEIGHT = 4;
   const MAX_HEIGHT = 32;
-  waveformTimer = setInterval(() => {
+
+  function rms() {
     waveformAnalyser.getByteTimeDomainData(data);
     let sumSquares = 0;
     for (let i = 0; i < data.length; i++) {
       const v = (data[i] - 128) / 128;
       sumSquares += v * v;
     }
-    const rms = Math.sqrt(sumSquares / data.length);
-    // Normal conversational volume rarely pushes RMS anywhere near 1.0, so
-    // scaling linearly kept movement subtle even with real signal — sqrt
-    // boosts quieter/typical speech levels to make movement obvious rather
-    // than only reacting to shouting.
-    const level = Math.sqrt(rms);
+    return Math.sqrt(sumSquares / data.length);
+  }
+
+  // A flat sqrt curve on raw RMS (a prior version of this) boosted quiet
+  // levels so aggressively that ambient/background noise flickered the
+  // bars too, while actual speech barely stood out above that already-
+  // boosted floor. Calibrate to this room's actual ambient noise level for
+  // the first ~500ms instead of guessing a fixed threshold — quiet vs
+  // noisy rooms need different cutoffs for "is this your voice, or just
+  // background sound" to work at all.
+  let calibrating = true;
+  const calibrationSamples = [];
+  let noiseFloor = 0.01;
+  setTimeout(() => {
+    if (calibrationSamples.length) {
+      const avg = calibrationSamples.reduce((a, b) => a + b, 0) / calibrationSamples.length;
+      noiseFloor = avg * 1.6 + 0.005; // margin above the observed ambient level
+    }
+    calibrating = false;
+  }, 500);
+
+  waveformTimer = setInterval(() => {
+    const level = rms();
+    if (calibrating) {
+      calibrationSamples.push(level);
+      return; // hold at baseline while sampling ambient noise
+    }
+    const ceiling = Math.max(noiseFloor + 0.05, 0.22);
+    const gated = Math.max(0, level - noiseFloor);
+    const normalized = Math.min(1, gated / (ceiling - noiseFloor));
+    const scaled = Math.sqrt(normalized);
     waveformBars.forEach((bar, i) => {
-      const height = MIN_HEIGHT + level * (MAX_HEIGHT - MIN_HEIGHT) * barMultipliers[i];
+      const height = MIN_HEIGHT + scaled * (MAX_HEIGHT - MIN_HEIGHT) * barMultipliers[i];
       bar.style.height = `${Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, height))}px`;
     });
   }, 60);
