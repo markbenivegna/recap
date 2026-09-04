@@ -8,7 +8,7 @@ from flask import Flask, jsonify, request, send_from_directory
 
 load_dotenv()
 
-from backend import audio_switch, markdown_export, notion_client
+from backend import audio_switch, config as app_config, markdown_export, notion_client
 from backend.diarize import diarize_segments, diarize_with_source_separation, format_transcript_with_speakers
 from backend.summarize import summarize_transcript
 from backend.transcribe import transcribe_audio
@@ -89,6 +89,20 @@ def api_summarize():
         return jsonify(result)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/settings", methods=["GET"])
+def api_settings_get():
+    return jsonify(app_config.read_config())
+
+
+@app.route("/api/settings", methods=["POST"])
+def api_settings_post():
+    data = request.get_json(silent=True) or {}
+    app_config.write_config(data)
+    global RECORDING_OUTPUT_DEVICE
+    RECORDING_OUTPUT_DEVICE = os.environ.get("RECORDING_OUTPUT_DEVICE", "")
+    return jsonify({"ok": True})
 
 
 @app.route("/api/audio/prepare-recording", methods=["POST"])

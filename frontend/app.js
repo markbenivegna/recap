@@ -16,6 +16,18 @@ const notionSelect = document.getElementById("notionSelect");
 const fileBtn = document.getElementById("fileBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 const fileStatus = document.getElementById("fileStatus");
+const newRecordingBtn = document.getElementById("newRecordingBtn");
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsModal = document.getElementById("settingsModal");
+const settingsIntro = document.getElementById("settingsIntro");
+const settingsForm = document.getElementById("settingsForm");
+const settingsCancelBtn = document.getElementById("settingsCancelBtn");
+const settingsStatus = document.getElementById("settingsStatus");
+const cfgAnthropicKey = document.getElementById("cfgAnthropicKey");
+const cfgNotionKey = document.getElementById("cfgNotionKey");
+const cfgWhisperSize = document.getElementById("cfgWhisperSize");
+const cfgVocabHints = document.getElementById("cfgVocabHints");
+const cfgOutputDevice = document.getElementById("cfgOutputDevice");
 
 let mediaRecorder = null;
 let micRecorder = null;
@@ -295,9 +307,29 @@ fileInput.addEventListener("change", () => {
   fileInput.value = "";
 });
 
+function resetToNewRecording() {
+  lastResult = null;
+  resultsEl.hidden = true;
+  newRecordingBtn.hidden = true;
+  emptyEl.hidden = false;
+  meetingTitleEl.hidden = true;
+  meetingTitleEl.textContent = "";
+  summaryContent.textContent = "";
+  notesContent.textContent = "";
+  transcriptContent.innerHTML = "";
+  notionSelect.innerHTML = '<option value="">Loading pages...</option>';
+  fileBtn.disabled = true;
+  fileStatus.textContent = "";
+  switchTab("summary");
+  setStatus("");
+}
+
+newRecordingBtn.addEventListener("click", resetToNewRecording);
+
 async function handleAudioBlob(blob, filename, micBlob, systemBlob) {
   emptyEl.hidden = true;
   resultsEl.hidden = false;
+  newRecordingBtn.hidden = true;
   setStatus("Transcribing locally (this can take a minute)...", false, true);
 
   const formData = new FormData();
@@ -370,6 +402,7 @@ async function generateSummary(transcriptText) {
     }
     switchTab("summary");
     setStatus("");
+    newRecordingBtn.hidden = false;
     loadNotionPages();
   } catch (err) {
     summaryContent.textContent = "";
@@ -437,6 +470,68 @@ fileBtn.addEventListener("click", async () => {
     fileBtn.disabled = false;
   }
 });
+
+async function openSettings({ isFirstRun = false } = {}) {
+  settingsStatus.textContent = "";
+  settingsIntro.hidden = !isFirstRun;
+  try {
+    const res = await fetch("/api/settings");
+    const data = await res.json();
+    cfgAnthropicKey.value = data.ANTHROPIC_API_KEY || "";
+    cfgNotionKey.value = data.NOTION_API_KEY || "";
+    cfgWhisperSize.value = data.WHISPER_MODEL_SIZE || "small";
+    cfgVocabHints.value = data.VOCABULARY_HINTS || "";
+    cfgOutputDevice.value = data.RECORDING_OUTPUT_DEVICE || "";
+  } catch (err) {
+    settingsStatus.textContent = `Could not load current settings: ${err.message}`;
+  }
+  settingsModal.hidden = false;
+}
+
+function closeSettings() {
+  settingsModal.hidden = true;
+}
+
+settingsBtn.addEventListener("click", () => openSettings());
+settingsCancelBtn.addEventListener("click", closeSettings);
+
+settingsForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  settingsStatus.textContent = "Saving...";
+  try {
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ANTHROPIC_API_KEY: cfgAnthropicKey.value.trim(),
+        NOTION_API_KEY: cfgNotionKey.value.trim(),
+        WHISPER_MODEL_SIZE: cfgWhisperSize.value,
+        VOCABULARY_HINTS: cfgVocabHints.value.trim(),
+        RECORDING_OUTPUT_DEVICE: cfgOutputDevice.value.trim(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Save failed");
+    settingsStatus.textContent = "Saved. Whisper/vocabulary changes apply next time you restart Recap.";
+    setTimeout(closeSettings, 1500);
+  } catch (err) {
+    settingsStatus.textContent = `Error: ${err.message}`;
+  }
+});
+
+// First-run: if the essential keys aren't set yet, open Settings
+// automatically instead of leaving the user to discover the gear icon.
+(async function checkFirstRun() {
+  try {
+    const res = await fetch("/api/settings");
+    const data = await res.json();
+    if (!data.ANTHROPIC_API_KEY) {
+      openSettings({ isFirstRun: true });
+    }
+  } catch (err) {
+    // Non-fatal — settings just won't auto-open.
+  }
+})();
 
 downloadBtn.addEventListener("click", async () => {
   if (!lastResult) return;

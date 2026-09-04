@@ -31,17 +31,15 @@ pip install -r requirements.txt
 
 ### 2. Configure API keys
 
-```bash
-cp .env.example .env
-```
+You don't need to touch `.env` by hand — build the app first (next step), open it, and it'll walk you through this. But you do still need the two keys themselves:
 
-Open `.env` in any text editor and fill in:
-
-- **`ANTHROPIC_API_KEY`** — go to [console.anthropic.com](https://console.anthropic.com), sign in (this is a separate pay-as-you-go account from a claude.ai subscription), open **API Keys** in the left sidebar, click **Create Key**, and paste the value in. A typical meeting (transcription + summarization) costs a few cents.
-- **`NOTION_API_KEY`** — go to [notion.so/my-integrations](https://www.notion.so/my-integrations), click **New integration**, give it any name (e.g. "Recap"), and create it. Copy the **Internal Integration Secret** it shows you into `.env`.
+- **`ANTHROPIC_API_KEY`** — go to [console.anthropic.com](https://console.anthropic.com), sign in (this is a separate pay-as-you-go account from a claude.ai subscription), open **API Keys** in the left sidebar, click **Create Key**, and copy it. A typical meeting (transcription + summarization) costs a few cents.
+- **`NOTION_API_KEY`** — go to [notion.so/my-integrations](https://www.notion.so/my-integrations), click **New integration**, give it any name (e.g. "Recap"), and create it. Copy the **Internal Integration Secret** it shows you.
   - **Then, separately**, in Notion itself: open every page or database you want to be able to file meeting notes into, click the **`...`** menu in the top right, go to **Connections**, and connect your new integration. Repeat for each page — pages not explicitly connected this way will never show up in the app's dropdown, even though the API key itself is valid.
 
-Everything else in `.env` (`WHISPER_MODEL_SIZE`, `VOCABULARY_HINTS`, `DIARIZATION_THRESHOLD`, `RECORDING_OUTPUT_DEVICE`) has a working default — see the comments in `.env.example`, or the [System audio](#system-audio-hearing-both-sides-of-a-call) section below if you want to capture both sides of a call.
+The first time Recap opens with no key set, it automatically opens **Settings** (the ⚙ icon) for you to paste both keys in — no text editor, no `.env` required. You can also open Settings any time later to change them, the Whisper model size, vocabulary hints, or the system-audio output device.
+
+Prefer editing `.env` directly instead? `cp .env.example .env` and fill it in the same way — see the comments in `.env.example` for every available option, including `DIARIZATION_THRESHOLD` (not exposed in the Settings UI since it rarely needs changing).
 
 ### 3. Build the app
 
@@ -54,6 +52,7 @@ This creates **Recap.app** in `~/Applications` with a custom icon — a one-time
 ### 4. First launch
 
 - macOS will likely show an **"unidentified developer"** Gatekeeper warning, since the app isn't code-signed. Right-click (or Control-click) the app in Finder and choose **Open** once — you'll only need to do this the first time.
+- With no `ANTHROPIC_API_KEY` set yet, Recap opens straight to **Settings** — paste in your Anthropic and Notion keys from step 2 and hit **Save**.
 - Clicking **Record** for the first time triggers a normal macOS microphone-permission prompt — click **Allow**.
 - The very first recording you transcribe will trigger a one-time download of the `faster-whisper` model (a few hundred MB for the default `small` size) and the speaker-diarization model (`speechbrain/spkrec-ecapa-voxceleb`, downloaded to `.cache/`) — expect that first transcription to take noticeably longer than later ones while those download. Everything after that runs fully offline.
 
@@ -76,7 +75,8 @@ If you ever move the project folder, or want to regenerate the icon, re-run `./s
 1. Click **Record** (grants mic access) or **Upload audio** for an existing file.
 2. Stop the recording — it's transcribed locally, then summarized via Claude.
 3. Read the result across the **Summary**, **Notes**, and **Transcript** tabs.
-4. Pick a destination from the Notion dropdown (populated live from your workspace) and click **File to Notion** to create a new page there.
+4. Either pick a destination from the Notion dropdown (populated live from your workspace) and click **File to Notion** to create a new page there, or click **Save Markdown** to save a `.md` file locally instead — no Notion required.
+5. Click **New Recording** to clear the current result and start another one.
 
 ## Notes
 

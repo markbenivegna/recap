@@ -19,13 +19,60 @@
         <span class="waveform-bar"></span>
       </div>
       <span id="timer" class="timer" hidden>00:00</span>
+      <button id="newRecordingBtn" class="btn btn-secondary" hidden>New Recording</button>
       <button id="recordBtn" class="btn btn-record">Record</button>
       <label class="btn btn-secondary file-label">
         Upload audio
         <input id="fileInput" type="file" accept="audio/*" hidden />
       </label>
+      <button id="settingsBtn" class="btn btn-icon" title="Settings" aria-label="Settings">⚙</button>
     </div>
   </header>
+
+  <div id="settingsModal" class="modal-overlay" hidden>
+    <div class="modal">
+      <h2 id="settingsHeading">Settings</h2>
+      <p id="settingsIntro" class="modal-intro" hidden>
+        Add your API keys to get started — nothing here leaves your Mac except direct calls to Anthropic/Notion.
+      </p>
+      <form id="settingsForm">
+        <label class="field">
+          <span>Anthropic API key</span>
+          <small><a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys</small>
+          <input type="password" id="cfgAnthropicKey" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Notion API key</span>
+          <small><a href="https://www.notion.so/my-integrations" target="_blank">notion.so/my-integrations</a> → New integration. Then connect it to specific pages from within Notion itself (page's <code>...</code> menu → Connections).</small>
+          <input type="password" id="cfgNotionKey" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Whisper model size</span>
+          <small>Applies next time you restart Recap.</small>
+          <select id="cfgWhisperSize">
+            <option value="base">base (fastest)</option>
+            <option value="small">small (default)</option>
+            <option value="medium">medium (most accurate)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Vocabulary hints</span>
+          <small>Comma-separated names/jargon Whisper tends to mishear. Applies next restart.</small>
+          <input type="text" id="cfgVocabHints" placeholder="e.g. Mando Man, RenoPinball" />
+        </label>
+        <label class="field">
+          <span>Recording output device</span>
+          <small>Exact Multi-Output Device name for system-audio auto-switching (optional). See README.</small>
+          <input type="text" id="cfgOutputDevice" />
+        </label>
+        <div class="modal-actions">
+          <button type="button" id="settingsCancelBtn" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+        <p id="settingsStatus" class="file-status"></p>
+      </form>
+    </div>
+  </div>
 
   <div id="status" class="status" hidden>
     <span id="statusSpinner" class="spinner" hidden></span>
