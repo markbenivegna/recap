@@ -63,7 +63,7 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
 let activeStreams = [];
 let audioCtx = null;
 let waveformAnalyser = null;
-let waveformRAF = null;
+let waveformTimer = null;
 
 function startWaveform(stream) {
   if (!audioCtx) {
@@ -73,15 +73,22 @@ function startWaveform(stream) {
   waveformAnalyser.fftSize = 256;
   audioCtx.createMediaStreamSource(stream).connect(waveformAnalyser);
 
-  // Frequency-bin-per-bar (the previous approach) meant most bars landed on
+  // Frequency-bin-per-bar (an earlier approach) meant most bars landed on
   // higher-frequency bins where voice has almost no energy, so only the
-  // first bar (the low-frequency bin) ever visibly moved. Use one overall
-  // volume level (RMS of the time-domain signal) instead, applied to every
-  // bar with a small fixed per-bar multiplier for natural-looking variation
-  // — guarantees all bars react together to actual signal.
+  // first bar ever visibly moved. Use one overall volume level (RMS of the
+  // time-domain signal) instead, applied to every bar with a small fixed
+  // per-bar multiplier for natural-looking variation — all bars react
+  // together to actual signal.
+  //
+  // Driven by setInterval, not requestAnimationFrame: rAF is spec'd to stop
+  // firing whenever the page isn't considered "visible", and pywebview's
+  // native window doesn't always wire up the Page Visibility API the way a
+  // real browser tab does — so rAF can silently never run at all here, even
+  // though the window is genuinely on screen. setInterval isn't gated by
+  // that.
   const barMultipliers = Array.from(waveformBars, () => 0.6 + Math.random() * 0.7);
   const data = new Uint8Array(waveformAnalyser.fftSize);
-  const draw = () => {
+  waveformTimer = setInterval(() => {
     waveformAnalyser.getByteTimeDomainData(data);
     let sumSquares = 0;
     for (let i = 0; i < data.length; i++) {
@@ -92,16 +99,14 @@ function startWaveform(stream) {
     waveformBars.forEach((bar, i) => {
       bar.style.height = `${Math.max(4, Math.min(24, rms * 90 * barMultipliers[i]))}px`;
     });
-    waveformRAF = requestAnimationFrame(draw);
-  };
+  }, 60);
   waveformEl.hidden = false;
-  draw();
 }
 
 function stopWaveform() {
-  if (waveformRAF) {
-    cancelAnimationFrame(waveformRAF);
-    waveformRAF = null;
+  if (waveformTimer) {
+    clearInterval(waveformTimer);
+    waveformTimer = null;
   }
   waveformAnalyser = null;
   waveformEl.hidden = true;
