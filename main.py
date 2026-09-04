@@ -50,14 +50,14 @@ def patch_mic_permission_passthrough():
         from webview.platforms.cocoa import BrowserView
 
         BrowserDelegate = BrowserView.BrowserDelegate
-        pyobjc_method_signature = BrowserView.pyobjc_method_signature
 
         def webView_requestMediaCapturePermissionForOrigin_initiatedByFrame_type_decisionHandler_(
             self, webview_, origin, frame, media_type, handler
         ):
-            if not handler.__block_signature__:
-                handler.__block_signature__ = pyobjc_method_signature(b'v@i')
-
+            # Unlike some of pywebview's own handler blocks, WebKit hands us
+            # this one with its type signature already embedded, so it can
+            # be called directly — no need for pywebview's private,
+            # version-fragile ctypes/dlsym signature workaround.
             status = AVCaptureDevice.authorizationStatusForMediaType_(AVMediaTypeAudio)
             if status == 3:  # AVAuthorizationStatusAuthorized
                 decision = getattr(WebKit, 'WKPermissionDecisionGrant', 1)
