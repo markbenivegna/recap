@@ -432,6 +432,11 @@ async function generateSummary(transcriptText) {
   }
 }
 
+function updateFileBtnLabel() {
+  const selected = notionSelect.options[notionSelect.selectedIndex];
+  fileBtn.textContent = selected && selected.value ? `File to ${selected.textContent}` : "File to Notion";
+}
+
 async function loadNotionPages() {
   notionSelect.innerHTML = '<option value="">Loading pages...</option>';
   notionSelect.disabled = true;
@@ -457,12 +462,15 @@ async function loadNotionPages() {
     if (data.pages.length === 0) {
       notionSelect.innerHTML = '<option value="">No pages shared</option>';
     }
+    updateFileBtnLabel();
   } catch (err) {
     notionSelect.innerHTML = '<option value="">Unavailable</option>';
     notionSelect.disabled = true;
     fileStatus.textContent = err.message;
   }
 }
+
+notionSelect.addEventListener("change", updateFileBtnLabel);
 
 fileBtn.addEventListener("click", async () => {
   if (!notionSelect.value || !lastResult) return;
