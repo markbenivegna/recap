@@ -31,7 +31,7 @@ def find_port():
 
 
 def run_flask(port):
-    app.run(host=HOST, port=port, debug=False, use_reloader=False)
+    app.run(host=HOST, port=port, debug=False, use_reloader=False, threaded=True)
 
 
 def apply_mac_dock_branding():

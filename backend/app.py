@@ -188,4 +188,4 @@ def api_download_markdown():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5151, debug=os.environ.get("FLASK_DEBUG") == "1")
+    app.run(host="127.0.0.1", port=5151, debug=os.environ.get("FLASK_DEBUG") == "1", threaded=True)
