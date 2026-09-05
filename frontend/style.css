@@ -276,8 +276,8 @@ h1 {
   display: inline-flex;
   gap: 4px;
   background: var(--hover-bg);
-  padding: 4px;
-  border-radius: 10px;
+  padding: 2px;
+  border-radius: 8px;
   box-shadow: 0 0 0 1px var(--border);
   margin-bottom: 20px;
 }
@@ -595,7 +595,8 @@ h1 {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   width: 100%;
   padding: 8px 12px;
   border-radius: 8px;
@@ -603,6 +604,7 @@ h1 {
   background-color: var(--bg);
   color: var(--text);
   font-size: 14px;
+  font-family: inherit;
   box-shadow: 0 0 0 1px var(--border), var(--shadow-xs);
   transition: box-shadow 100ms linear;
 }
@@ -611,10 +613,17 @@ h1 {
   padding-right: 36px;
 }
 
+.field textarea {
+  resize: vertical;
+  min-height: 40px;
+  line-height: 1.4;
+}
+
 /* Focus (their input.tsx isFocusWithin): the 1px neutral ring is
    entirely replaced by a 2px accent ring — not layered on top of it. */
 .field input:focus,
 .field select:focus,
+.field textarea:focus,
 .file-bar select:focus {
   outline: none;
   box-shadow: 0 0 0 2px var(--accent-hover);
