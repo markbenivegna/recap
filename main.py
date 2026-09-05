@@ -63,9 +63,20 @@ def hide_titlebar_text(window):
         # That's invisible in light mode, but in dark mode it's what was
         # showing through as a stray white bar up top — our own dark CSS
         # only covers the WKWebView's content area, not the native window
-        # behind/around it. windowBackgroundColor is a dynamic system
-        # color that tracks light/dark mode on its own.
-        native.setBackgroundColor_(NSColor.windowBackgroundColor())
+        # behind/around it.
+        #
+        # windowBackgroundColor looked like the obvious fix but isn't an
+        # exact match for our page background in either mode (it's a
+        # slightly-off system gray, not true #fff/#000), so the seam just
+        # came back in a different color. Match our CSS exactly instead —
+        # it's pure black/white on both sides, so plain black/white works.
+        from AppKit import NSAppearanceNameAqua, NSAppearanceNameDarkAqua
+
+        best_match = native.effectiveAppearance().bestMatchFromAppearancesWithNames_(
+            [NSAppearanceNameAqua, NSAppearanceNameDarkAqua]
+        )
+        is_dark = best_match == NSAppearanceNameDarkAqua
+        native.setBackgroundColor_(NSColor.blackColor() if is_dark else NSColor.whiteColor())
     except Exception:
         pass
 
