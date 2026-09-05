@@ -1,15 +1,27 @@
 # Recap
 
-Local macOS app: record or upload a meeting, transcribe it on-device with
-`faster-whisper`, summarize it with the Claude API, and file the result into
-Notion as a new page.
+I got tired of meeting-notes apps that want a monthly subscription just to
+ship my audio off to someone else's server. So this is the one I actually
+use: it's a real Mac app that lives in `~/Applications`, records your mic
+(and the other side of the call, if you want), transcribes everything
+on-device, and only sends the resulting text — never audio — up to Claude
+for the summary. Everything else stays on your laptop.
+
+When it's done, it can file the whole thing straight into Notion, formatted
+the way a real page should look — action items as checkboxes, real headings,
+a collapsible transcript — or just drop a Markdown file on your Desktop if
+you'd rather skip Notion entirely.
 
 ![Summary view](assets/screenshot-summary.png)
 ![Transcript view with speaker labels](assets/screenshot-transcript.png)
 
-(Screenshots use placeholder content, not real meeting data.)
+(Screenshots use placeholder content, not real meeting data — I'm not
+putting an actual meeting of mine in a public README.)
 
 ## Setup
+
+None of this is bad, but there are a few steps — it's a real app you build
+once, not a `pip install`. Should take maybe ten minutes.
 
 ### 0. Prerequisites
 
@@ -77,6 +89,8 @@ If you ever move the project folder, or want to regenerate the icon, re-run `./s
 
 ## Flow
 
+Nothing surprising here, which is the point:
+
 1. Click **Record** (grants mic access) or **Upload audio** for an existing file.
 2. Stop the recording — it's transcribed locally, then summarized via Claude.
 3. Read the result across the **Summary**, **Notes**, and **Transcript** tabs.
@@ -88,6 +102,22 @@ If you ever move the project folder, or want to regenerate the icon, re-run `./s
 - Recordings are transcribed then deleted from disk immediately after.
 - Only pages/databases explicitly shared with your Notion integration show up in the dropdown.
 - `WHISPER_MODEL_SIZE` in `.env` controls the local model (`small` by default; try `medium` for better accuracy or `base` for more speed).
+
+## Why not just use [thing that already exists]
+
+Fair question — there's no shortage of "AI meeting notetaker" products, and
+some of them are good. A few reasons I ended up building my own instead:
+
+- I wanted the transcription actually local, not "we don't train on your
+  data" local. `faster-whisper` runs on your machine; nothing but the final
+  transcript text ever leaves it.
+- I wanted it to file into Notion looking like a page I'd actually want to
+  read, not a wall of undifferentiated text.
+- Mostly, I just wanted to know exactly what it does, because I wrote it.
+
+If you just want something that works today without touching a terminal,
+a paid app is probably the better trade. This one's for people who'd rather
+own the thing.
 
 ## System audio (hearing both sides of a call)
 
@@ -139,7 +169,8 @@ MIDI Setup instead.
 
 ## Speaker labels
 
-Recordings are automatically split by speaker using a speaker-embedding
+This was the hardest part to get right, honestly. Recordings are
+automatically split by speaker using a speaker-embedding
 model (`speechbrain/spkrec-ecapa-voxceleb` — an openly downloadable model, no
 account or sign-up needed, unlike some diarization tools). This runs locally
 alongside Whisper. When summarizing, Claude will use a speaker's real name in
