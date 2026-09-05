@@ -8,6 +8,7 @@ const statusEl = document.getElementById("status");
 const statusTextEl = document.getElementById("statusText");
 const statusSpinnerEl = document.getElementById("statusSpinner");
 const emptyEl = document.getElementById("empty");
+const recordingAnimationEl = document.getElementById("recordingAnimation");
 const resultsEl = document.getElementById("results");
 const meetingTitleEl = document.getElementById("meetingTitle");
 const summaryContent = document.getElementById("summaryContent");
@@ -127,6 +128,52 @@ let activeStreams = [];
 let audioCtx = null;
 let waveformAnalyser = null;
 let waveformTimer = null;
+
+// Lazily loaded so the (relatively large) animation JSON is only fetched
+// once someone actually hits Record, not on every app launch.
+let recordingLottie = null;
+let recordingAnimationTimer = null;
+let recordingAnimationStart = 0;
+
+// Lottie's own autoplay/loop ticks itself via requestAnimationFrame, which
+// hits the exact same pywebview bug documented on startWaveform() above:
+// rAF can silently stall while the native window isn't considered
+// "visible" even though it's genuinely on screen, then dumps a backlog of
+// frames all at once when it resumes — the "fragmented and slow" look.
+// Drive it ourselves on a setInterval instead, computing the target frame
+// from wall-clock elapsed time (mod the clip length) so a delayed tick
+// jumps straight to the correct frame instead of catching up frame-by-frame.
+function driveRecordingAnimation() {
+  if (!recordingLottie || !recordingLottie.isLoaded) return;
+  const frameRate = recordingLottie.frameRate || 30;
+  const totalFrames = recordingLottie.totalFrames || 1;
+  const durationMs = (totalFrames / frameRate) * 1000;
+  const elapsed = (performance.now() - recordingAnimationStart) % durationMs;
+  recordingLottie.goToAndStop((elapsed / durationMs) * totalFrames, true);
+}
+
+function playRecordingAnimation() {
+  recordingAnimationEl.hidden = false;
+  recordingAnimationStart = performance.now();
+  if (recordingAnimationTimer) clearInterval(recordingAnimationTimer);
+  recordingAnimationTimer = setInterval(driveRecordingAnimation, 1000 / 30);
+  if (recordingLottie) return;
+  recordingLottie = lottie.loadAnimation({
+    container: recordingAnimationEl,
+    renderer: "svg",
+    loop: false,
+    autoplay: false,
+    path: "assets/notes-document.json",
+  });
+}
+
+function stopRecordingAnimation() {
+  recordingAnimationEl.hidden = true;
+  if (recordingAnimationTimer) {
+    clearInterval(recordingAnimationTimer);
+    recordingAnimationTimer = null;
+  }
+}
 
 function startWaveform(stream) {
   if (!audioCtx) {
@@ -324,6 +371,7 @@ async function startRecording() {
     if (systemRecorder) systemRecorder.start();
     recording = true;
     emptyEl.hidden = true;
+    playRecordingAnimation();
     recordingStart = Date.now();
     recordBtn.textContent = "Stop";
     recordBtn.classList.add("recording");
@@ -343,6 +391,7 @@ async function startRecording() {
 function stopRecording() {
   if (mediaRecorder && recording) {
     stopWaveform();
+    stopRecordingAnimation();
     [mediaRecorder, micRecorder, systemRecorder].forEach((r) => {
       if (r && r.state !== "inactive") r.stop();
     });
@@ -398,6 +447,7 @@ newRecordingBtn.addEventListener("click", resetToNewRecording);
 
 async function handleAudioBlob(blob, filename, micBlob, systemBlob) {
   emptyEl.hidden = true;
+  stopRecordingAnimation();
   resultsEl.hidden = false;
   newRecordingBtn.hidden = true;
   showIdleControls(false);
@@ -513,10 +563,14 @@ async function loadNotionPages() {
     if (data.pages.length === 0) {
       notionSelect.innerHTML = '<option value="">No pages shared</option>';
     }
+    // Only one destination — there's nothing to actually choose between,
+    // so drop the caret/dropdown entirely and just show a plain button.
+    splitBtn.classList.toggle("split-btn-single", data.pages.length === 1);
     updateFileBtnLabel();
   } catch (err) {
     notionSelect.innerHTML = '<option value="">Unavailable</option>';
     setFileBtnDisabled(true);
+    splitBtn.classList.remove("split-btn-single");
     fileStatus.textContent = err.message;
   }
 }
