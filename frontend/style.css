@@ -276,8 +276,8 @@ h1 {
   display: inline-flex;
   gap: 4px;
   background: var(--hover-bg);
-  padding: 2px;
-  border-radius: 8px;
+  padding: 0;
+  border-radius: 6px;
   box-shadow: 0 0 0 1px var(--border);
   margin-bottom: 20px;
 }
