@@ -434,12 +434,17 @@ async function generateSummary(transcriptText) {
 
 async function loadNotionPages() {
   notionSelect.innerHTML = '<option value="">Loading pages...</option>';
+  notionSelect.disabled = true;
+  fileBtn.disabled = true;
   try {
     const res = await fetch("/api/notion/pages");
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed to load Notion pages");
 
-    notionSelect.innerHTML = '<option value="">Select a page...</option>';
+    // No placeholder option — the select defaults to its first entry, so
+    // filing always defaults to the first page. The select itself is just
+    // the caret half of a split button for changing that destination.
+    notionSelect.innerHTML = "";
     data.pages.forEach((page) => {
       const opt = document.createElement("option");
       opt.value = page.id;
@@ -447,16 +452,17 @@ async function loadNotionPages() {
       opt.textContent = page.type === "database" ? `${page.title} (database)` : page.title;
       notionSelect.appendChild(opt);
     });
-    fileBtn.disabled = false;
+    notionSelect.disabled = data.pages.length === 0;
+    fileBtn.disabled = data.pages.length === 0;
+    if (data.pages.length === 0) {
+      notionSelect.innerHTML = '<option value="">No pages shared</option>';
+    }
   } catch (err) {
     notionSelect.innerHTML = '<option value="">Unavailable</option>';
+    notionSelect.disabled = true;
     fileStatus.textContent = err.message;
   }
 }
-
-notionSelect.addEventListener("change", () => {
-  fileBtn.disabled = !notionSelect.value;
-});
 
 fileBtn.addEventListener("click", async () => {
   if (!notionSelect.value || !lastResult) return;

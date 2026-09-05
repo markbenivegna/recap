@@ -28,7 +28,12 @@
         Upload audio
         <input id="fileInput" type="file" accept="audio/*" hidden />
       </label>
-      <button id="settingsBtn" class="btn btn-icon" title="Settings" aria-label="Settings">⚙</button>
+      <button id="settingsBtn" class="btn btn-icon" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
     </div>
   </header>
 
@@ -110,11 +115,17 @@
 
       <footer class="file-bar">
         <span id="notionFileGroup" class="notion-file-group" hidden>
-          <label for="notionSelect">File to Notion:</label>
-          <select id="notionSelect">
-            <option value="">Loading pages...</option>
-          </select>
-          <button id="fileBtn" class="btn btn-primary" disabled>File to Notion</button>
+          <span class="split-btn">
+            <button id="fileBtn" class="btn btn-primary split-btn-main" disabled>File to Notion</button>
+            <select id="notionSelect" class="split-btn-select" aria-label="Notion destination page">
+              <option value="">Loading pages...</option>
+            </select>
+            <span class="split-btn-caret" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </span>
+          </span>
         </span>
         <button id="downloadBtn" class="btn btn-secondary">Save Markdown</button>
         <span id="notionHint" class="file-status" hidden>Connect Notion in Settings to file notes there directly.</span>
