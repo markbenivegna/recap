@@ -10,6 +10,7 @@ CONFIG_FIELDS = [
     ("VOCABULARY_HINTS", False),
     ("DIARIZATION_THRESHOLD", False),
     ("RECORDING_OUTPUT_DEVICE", False),
+    ("SPEND_ALERT_THRESHOLD", False),
 ]
 
 

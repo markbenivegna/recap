@@ -2,6 +2,8 @@ import os
 
 import anthropic
 
+from backend.usage_tracker import record_usage
+
 MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 
 SYSTEM_PROMPT = """You turn raw meeting transcripts into three things:
@@ -64,6 +66,8 @@ def summarize_transcript(transcript_text):
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": f"Transcript:\n\n{transcript_text}"}],
     )
+
+    record_usage(MODEL, message.usage.input_tokens, message.usage.output_tokens)
 
     raw = "".join(block.text for block in message.content if block.type == "text")
     return _parse_response(raw)

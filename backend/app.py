@@ -8,7 +8,7 @@ from flask import Flask, jsonify, request, send_from_directory
 
 load_dotenv()
 
-from backend import audio_switch, config as app_config, markdown_export, notion_client
+from backend import audio_switch, config as app_config, markdown_export, notion_client, usage_tracker
 from backend.diarize import diarize_segments, diarize_with_source_separation, format_transcript_with_speakers
 from backend.summarize import summarize_transcript
 from backend.transcribe import transcribe_audio
@@ -76,7 +76,11 @@ def api_transcribe():
         except Exception:
             # Speaker labeling is best-effort — fall back to a plain
             # transcript rather than failing the whole request over it.
-            pass
+            # Logged (not swallowed silently) so a real failure is visible
+            # instead of just quietly missing speaker labels.
+            import traceback
+
+            traceback.print_exc()
         return jsonify(result)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
@@ -109,6 +113,23 @@ def api_settings_post():
     app_config.write_config(data)
     global RECORDING_OUTPUT_DEVICE
     RECORDING_OUTPUT_DEVICE = os.environ.get("RECORDING_OUTPUT_DEVICE", "")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/usage", methods=["GET"])
+def api_usage_get():
+    data = usage_tracker.get_usage()
+    threshold = os.environ.get("SPEND_ALERT_THRESHOLD", "").strip()
+    try:
+        data["alert_threshold"] = float(threshold) if threshold else None
+    except ValueError:
+        data["alert_threshold"] = None
+    return jsonify(data)
+
+
+@app.route("/api/usage/reset", methods=["POST"])
+def api_usage_reset():
+    usage_tracker.reset_usage()
     return jsonify({"ok": True})
 
 

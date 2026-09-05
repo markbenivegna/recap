@@ -1,5 +1,6 @@
 import contextlib
 import os
+import shutil
 import subprocess
 import tempfile
 
@@ -17,6 +18,24 @@ CLUSTER_THRESHOLD = float(os.environ.get("DIARIZATION_THRESHOLD", "0.7"))
 MIN_SEGMENT_SECONDS = 0.3
 
 _model = None
+
+
+def _find_ffmpeg_bin():
+    # Same issue as SwitchAudioSource in audio_switch.py: a GUI-launched app
+    # (opened from Finder/the app drawer, not a Terminal) gets a minimal
+    # PATH that doesn't include Homebrew's bin dir, so shutil.which() alone
+    # can miss ffmpeg even though it's installed and this exact call works
+    # fine when launched from an interactive shell.
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    for candidate in ("/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"):
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return "ffmpeg"
+
+
+_FFMPEG_BIN = _find_ffmpeg_bin()
 
 
 def get_model():
@@ -40,7 +59,7 @@ def _load_audio_mono(file_path):
             wav_path = tmp.name
         try:
             subprocess.run(
-                ["ffmpeg", "-y", "-i", file_path, "-ar", "16000", "-ac", "1", wav_path],
+                [_FFMPEG_BIN, "-y", "-i", file_path, "-ar", "16000", "-ac", "1", wav_path],
                 check=True,
                 capture_output=True,
             )
@@ -75,6 +94,23 @@ def _cosine_distance(a, b):
 def _rms(audio, sample_rate, start, end):
     clip = audio[int(start * sample_rate) : int(end * sample_rate)]
     return float(np.sqrt(np.mean(clip**2))) if len(clip) else 0.0
+
+
+def _rms_normalize(audio, target=0.1):
+    """Scale so the whole clip's overall RMS matches `target`. The mic/
+    system comparison below is itself RMS-based (average energy per
+    segment), so normalizing by RMS matches what's actually being
+    compared — peak-normalizing instead was a mistake: a single loud
+    transient (a click, a pop) anywhere in the file would skew the scale
+    for the entire rest of it, since peak looks at just one sample rather
+    than overall energy. This normalization compensates for
+    getUserMedia's autoGainControl no longer doing it automatically (it
+    had to be disabled elsewhere to stop echo cancellation from
+    suppressing the system-audio capture entirely)."""
+    overall_rms = float(np.sqrt(np.mean(audio**2))) if len(audio) else 0.0
+    if overall_rms == 0:
+        return audio
+    return audio * (target / overall_rms)
 
 
 def _embed_and_cluster(audio, sample_rate, segments, indices):
@@ -177,6 +213,8 @@ def diarize_with_source_separation(mic_path, system_path, segments):
 
     mic_audio, mic_sr = _load_audio_mono(mic_path)
     sys_audio, sys_sr = _load_audio_mono(system_path)
+    mic_audio = _rms_normalize(mic_audio)
+    sys_audio = _rms_normalize(sys_audio)
 
     mic_indices, system_indices = [], []
     for i, seg in enumerate(segments):
