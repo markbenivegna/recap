@@ -40,46 +40,50 @@
   <div id="settingsModal" class="modal-overlay" hidden>
     <div class="modal">
       <button id="settingsCloseBtn" class="modal-close" type="button" aria-label="Close">&times;</button>
-      <h2 id="settingsHeading">Settings</h2>
-      <p id="settingsIntro" class="modal-intro" hidden>
-        Add your API keys to get started — nothing here leaves your Mac except direct calls to Anthropic/Notion.
-      </p>
-      <form id="settingsForm">
-        <label class="field">
-          <span>Anthropic API key</span>
-          <small><a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys</small>
-          <input type="password" id="cfgAnthropicKey" autocomplete="off" />
-        </label>
-        <label class="field">
-          <span>Notion API key</span>
-          <small><a href="https://www.notion.so/my-integrations" target="_blank">notion.so/my-integrations</a> → New integration. Then connect it to specific pages from within Notion itself (page's <code>...</code> menu → Connections).</small>
-          <input type="password" id="cfgNotionKey" autocomplete="off" />
-        </label>
-        <label class="field">
-          <span>Whisper model size</span>
-          <small>Applies next time you restart Recap.</small>
-          <select id="cfgWhisperSize">
-            <option value="base">base (fastest)</option>
-            <option value="small">small (default)</option>
-            <option value="medium">medium (most accurate)</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Vocabulary hints</span>
-          <small>Comma-separated names/jargon Whisper tends to mishear. Applies next restart.</small>
-          <input type="text" id="cfgVocabHints" placeholder="e.g. Mando Man, RenoPinball" />
-        </label>
-        <label class="field">
-          <span>Recording output device</span>
-          <small>Exact Multi-Output Device name for system-audio auto-switching (optional). See README.</small>
-          <input type="text" id="cfgOutputDevice" />
-        </label>
-        <div class="modal-actions">
+      <div class="modal-body">
+        <h2 id="settingsHeading">Settings</h2>
+        <p id="settingsIntro" class="modal-intro" hidden>
+          Add your API keys to get started — nothing here leaves your Mac except direct calls to Anthropic/Notion.
+        </p>
+        <form id="settingsForm">
+          <label class="field">
+            <span>Anthropic API key</span>
+            <small><a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys</small>
+            <input type="password" id="cfgAnthropicKey" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Notion API key</span>
+            <small><a href="https://www.notion.so/my-integrations" target="_blank">notion.so/my-integrations</a> → New integration. Then connect it to specific pages from within Notion itself (page's <code>...</code> menu → Connections).</small>
+            <input type="password" id="cfgNotionKey" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Whisper model size</span>
+            <small>Applies next time you restart Recap.</small>
+            <select id="cfgWhisperSize">
+              <option value="base">base (fastest)</option>
+              <option value="small">small (default)</option>
+              <option value="medium">medium (most accurate)</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Vocabulary hints</span>
+            <small>Comma-separated names/jargon Whisper tends to mishear. Applies next restart.</small>
+            <input type="text" id="cfgVocabHints" placeholder="e.g. Mando Man, RenoPinball" />
+          </label>
+          <label class="field">
+            <span>Recording output device</span>
+            <small>Exact Multi-Output Device name for system-audio auto-switching (optional). See README.</small>
+            <input type="text" id="cfgOutputDevice" />
+          </label>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <span id="settingsStatus" class="file-status"></span>
+        <span class="modal-actions">
           <button type="button" id="settingsCancelBtn" class="btn btn-secondary">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save</button>
-        </div>
-        <p id="settingsStatus" class="file-status"></p>
-      </form>
+          <button type="submit" form="settingsForm" class="btn btn-primary">Save</button>
+        </span>
+      </div>
     </div>
   </div>
 
@@ -90,7 +94,16 @@
 
   <main class="content">
     <div id="empty" class="empty-state">
-      Record a meeting or upload an audio file to get started.
+      <div class="empty-state-icon">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" y1="19" x2="12" y2="23"></line>
+          <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+      </div>
+      <h2 class="empty-state-title">No meetings yet</h2>
+      <p class="empty-state-text">Record a meeting or upload an audio file to get started.</p>
     </div>
 
     <div id="results" hidden>

@@ -100,9 +100,9 @@ h1 {
 }
 
 .app-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
   display: block;
 }
 
@@ -218,11 +218,42 @@ h1 {
   background: var(--accent-hover);
 }
 
+/* Their empty-state.tsx pattern: a featured icon, a heading, then
+   supporting text — not just a single line of muted copy. */
 .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   color: var(--muted);
   text-align: center;
-  padding: 80px 20px;
-  font-size: 15px;
+  padding: 96px 20px;
+}
+
+.empty-state-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--hover-bg);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--hover-bg) 50%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+
+.empty-state-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.empty-state-text {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+  max-width: 320px;
 }
 
 .meeting-title {
@@ -379,7 +410,10 @@ h1 {
 }
 
 /* Native select styled to match their select-native.tsx: appearance-none
-   with our own chevron drawn in via background-image, font-medium. */
+   with our own chevron drawn in via background-image. Their spec uses
+   font-medium here, but that made selects look inconsistently heavier
+   than the plain-weight text inputs sitting right next to them in the
+   same form — kept at the same weight as inputs instead. */
 .file-bar select,
 .field select {
   appearance: none;
@@ -388,7 +422,6 @@ h1 {
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 36px;
-  font-weight: 500;
 }
 
 .file-bar select {
@@ -456,15 +489,32 @@ h1 {
 
 .modal {
   position: relative;
+  display: flex;
+  flex-direction: column;
   background: var(--panel);
   border-radius: 16px;
-  padding: 24px;
   width: 100%;
   max-width: 440px;
   max-height: 85vh;
-  overflow-y: auto;
   box-shadow: var(--shadow-xl);
   animation: modal-zoom-in 200ms ease-out;
+}
+
+/* Fields scroll; the footer below stays put so Save/Cancel are always
+   reachable regardless of how long the form gets. */
+.modal-body {
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.modal-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
 }
 
 /* Close button (their close-button.tsx, "sm" size: size-9 = 36px square,
@@ -502,12 +552,13 @@ h1 {
 .modal h2 {
   margin: 0 0 8px;
   padding-right: 40px;
-  font-size: 17px;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .modal-intro {
   margin: 0 0 24px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
 }
 
@@ -559,7 +610,5 @@ h1 {
 
 .modal-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 12px;
-  margin-top: 24px;
 }
