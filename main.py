@@ -12,6 +12,47 @@ APP_NAME = "Recap"
 ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png")
 
 
+def patch_media_capture_permission():
+    # pywebview's own WKUIDelegate (BrowserView.BrowserDelegate) doesn't
+    # implement requestMediaCapturePermissionForOrigin — the WKWebView API
+    # (macOS 12+) apps use to cache a mic-access decision themselves.
+    # Without it, WebKit falls back to its own default: showing its own
+    # permission popup on every single getUserMedia() call in a fresh
+    # page load, i.e. every app launch, regardless of the one-time macOS
+    # System Settings permission already granted via TCC. This is a
+    # documented WKWebView limitation (confirmed via WebKit/Apple docs),
+    # not something specific to this app.
+    #
+    # Subclassing BrowserDelegate (rather than patching a method onto the
+    # already-realized instance/class pywebview creates internally) so
+    # the new selector registers through PyObjC's normal class-creation
+    # path — deliberately avoiding the approach that crashed twice before
+    # in this project. Swapping the class reference on BrowserView before
+    # create_window()/start() run means pywebview's own
+    # `BrowserView.BrowserDelegate.alloc().init()` call picks up this
+    # subclass instead, with no changes needed to pywebview itself.
+    try:
+        from webview.platforms.cocoa import BrowserView
+        from WebKit import WKPermissionDecisionGrant
+
+        class PermissiveBrowserDelegate(BrowserView.BrowserDelegate):
+            def webView_requestMediaCapturePermissionForOrigin_initiatedByFrame_type_decisionHandler_(
+                self, webview_, origin, frame, media_type, decision_handler
+            ):
+                # Our real gate is the one-time System Settings mic
+                # permission (already tied to this app's own bundle
+                # identity). Grant automatically instead of showing
+                # WebKit's own redundant, non-persistent popup on top of
+                # that every launch.
+                if not decision_handler.__block_signature__:
+                    decision_handler.__block_signature__ = BrowserView.pyobjc_method_signature(b'v@q')
+                decision_handler(WKPermissionDecisionGrant)
+
+        BrowserView.BrowserDelegate = PermissiveBrowserDelegate
+    except Exception:
+        pass
+
+
 def find_port():
     # Prefer a fixed port so the app's origin (http://127.0.0.1:<port>) stays
     # the same across launches — WKWebView caches microphone permission per
@@ -126,6 +167,8 @@ if __name__ == "__main__":
     port = find_port()
     flask_thread = threading.Thread(target=run_flask, args=(port,), daemon=True)
     flask_thread.start()
+
+    patch_media_capture_permission()
 
     window = webview.create_window(
         APP_NAME, f"http://{HOST}:{port}", width=850, height=600, min_size=(700, 500), background_color="#FFFFFF"
