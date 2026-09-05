@@ -34,6 +34,21 @@ def run_flask(port):
     app.run(host=HOST, port=port, debug=False, use_reloader=False, threaded=True)
 
 
+def hide_titlebar_text(window):
+    # Keep the native close/minimize/zoom buttons but remove the title
+    # string and the visually distinct bar behind them, so the window
+    # reads as a single continuous surface instead of "content below a
+    # chrome bar" — same look as Notes/most modern Mac apps. Deliberately
+    # NOT using pywebview's own frameless=True: that also hides the
+    # traffic-light buttons themselves, which we want to keep.
+    try:
+        native = window.native
+        native.setTitlebarAppearsTransparent_(True)
+        native.setTitleVisibility_(1)  # NSWindowTitleHidden
+    except Exception:
+        pass
+
+
 def apply_mac_dock_branding():
     # We launch via the system's Python.app framework binary rather than a
     # compiled app bundle of our own, so macOS otherwise shows the Dock
@@ -59,6 +74,9 @@ if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, args=(port,), daemon=True)
     flask_thread.start()
 
-    webview.create_window(APP_NAME, f"http://{HOST}:{port}", width=850, height=600, min_size=(700, 500))
+    window = webview.create_window(
+        APP_NAME, f"http://{HOST}:{port}", width=850, height=600, min_size=(700, 500), background_color="#FFFFFF"
+    )
+    window.events.shown += lambda: hide_titlebar_text(window)
     apply_mac_dock_branding()
     webview.start()
