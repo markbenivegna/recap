@@ -57,6 +57,15 @@ def hide_titlebar_text(window):
         # shows, permanently, with none of the usual active/inactive
         # dimming. Clear it so our own content shows through instead.
         native.contentView().superview().subviews().lastObject().setBackgroundColor_(NSColor.clearColor())
+
+        # The window itself is created with a hardcoded white background
+        # (pywebview's background_color, default '#FFFFFF' either way).
+        # That's invisible in light mode, but in dark mode it's what was
+        # showing through as a stray white bar up top — our own dark CSS
+        # only covers the WKWebView's content area, not the native window
+        # behind/around it. windowBackgroundColor is a dynamic system
+        # color that tracks light/dark mode on its own.
+        native.setBackgroundColor_(NSColor.windowBackgroundColor())
     except Exception:
         pass
 

@@ -44,14 +44,17 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: var(--gray-900);
-    --panel: var(--gray-800);
-    --border: var(--gray-700);
-    --text: var(--gray-50);
-    --muted: var(--gray-400);
-    --hover-bg: var(--gray-700);
-    --overlay: rgba(37, 43, 55, 0.7);
-    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A4A7AE' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    /* Untitled UI's own dark-mode neutrals (gray-900/800/etc.) lean
+       visibly cool/blue — switched to true neutral (desaturated) grays
+       here instead, per direct preference. */
+    --bg: #000000;
+    --panel: #1a1a1a;
+    --border: #2e2e2e;
+    --text: #f5f5f5;
+    --muted: #9a9a9a;
+    --hover-bg: #262626;
+    --overlay: rgba(0, 0, 0, 0.7);
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239a9a9a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   }
 }
 
