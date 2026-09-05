@@ -358,11 +358,12 @@ h1 {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), var(--shadow-xs);
 }
 
-.split-btn-select {
+.split-btn .split-btn-select {
   position: absolute;
   top: 0;
   right: 0;
   width: 32px;
+  min-width: 0;
   height: 40px;
   opacity: 0;
   cursor: pointer;
@@ -409,18 +410,12 @@ h1 {
   color: var(--muted);
 }
 
-/* Utility icon button (their button-utility.tsx): smaller radius than a
-   regular button, but sized to match the height/width of the buttons
-   next to it (regular .btn is 40px tall: 10px+10px padding + 20px line-
-   height) — explicit width/height instead of padding math, since a text
-   glyph's box doesn't reliably center/size the way a real SVG icon would. */
+/* Utility icon button (their button-utility.tsx, "sm" size): rounded-md
+   (6px) + p-1.5 (6px padding) around a size-5 (20px) icon — their real,
+   literal spec, not padding tuned to match our other buttons' height. */
 .btn-icon {
-  width: 40px;
-  height: 40px;
-  padding: 0;
+  padding: 6px;
   border-radius: 6px;
-  font-size: 20px;
-  line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
