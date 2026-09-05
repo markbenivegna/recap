@@ -42,9 +42,21 @@ def hide_titlebar_text(window):
     # NOT using pywebview's own frameless=True: that also hides the
     # traffic-light buttons themselves, which we want to keep.
     try:
+        from AppKit import NSColor
+
         native = window.native
         native.setTitlebarAppearsTransparent_(True)
         native.setTitleVisibility_(1)  # NSWindowTitleHidden
+
+        # pywebview's own Cocoa backend (platforms/cocoa.py) always paints
+        # this specific titlebar subview with a static
+        # NSColor.windowBackgroundColor() — "so it does not change with
+        # the window color" per its own comment. Normally invisible
+        # because the OS draws its own dynamic chrome on top; once the
+        # titlebar is transparent that static paint is what actually
+        # shows, permanently, with none of the usual active/inactive
+        # dimming. Clear it so our own content shows through instead.
+        native.contentView().superview().subviews().lastObject().setBackgroundColor_(NSColor.clearColor())
     except Exception:
         pass
 
