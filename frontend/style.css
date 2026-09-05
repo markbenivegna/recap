@@ -75,7 +75,7 @@ body {
 .app {
   max-width: 900px;
   margin: 0 auto;
-  padding: 32px;
+  padding: 24px 32px 32px;
   min-height: 100vh;
 }
 
