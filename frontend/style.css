@@ -288,7 +288,8 @@ h1 {
   padding: 8px 10px;
   border-radius: 6px;
   font-size: 14px;
-  font-weight: 600;
+  line-height: 20px;
+  font-weight: 500;
   color: var(--muted);
   cursor: pointer;
   transition: background-color 100ms linear, color 100ms linear, box-shadow 100ms linear;
