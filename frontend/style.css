@@ -810,7 +810,12 @@ h1 {
   pointer-events: none;
 }
 
-.currency-input input {
+/* Targeted by ID, not just .currency-input input — the generic
+   .field input:not([type="range"]) rule (2 classes/attrs) is otherwise
+   more specific than a single-class-plus-element selector here (1 class
+   + 1 element) and silently won, resetting padding-left back to 12px
+   and putting the $ right on top of the typed value. */
+#cfgSpendThreshold {
   padding-left: 24px;
 }
 
