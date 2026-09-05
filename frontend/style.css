@@ -15,7 +15,7 @@
   --gray-900: #181d27;
   --gray-950: #0a0d12;
 
-  --bg: var(--gray-50);
+  --bg: #ffffff;
   --panel: #ffffff;
   --border: var(--gray-200);
   --text: var(--gray-900);
@@ -25,6 +25,7 @@
   --accent: #fed800;
   --accent-light: #ffe666;
   --accent-hover: #e0bf00;
+  --accent-hover-bg: #f2ca00;
   --accent-text: #2b2400;
 
   /* Elevation scale (Untitled UI's shadow tokens) */
@@ -35,6 +36,10 @@
 
   /* Overlay (Untitled UI: neutral-950 at 70%, blurred) */
   --overlay: rgba(10, 13, 18, 0.7);
+
+  /* Custom select chevron (their select-native.tsx: appearance-none + a
+     ChevronDown icon), colored to match --muted (text-fg-quaternary) */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23717680' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
 }
 
 @media (prefers-color-scheme: dark) {
@@ -46,6 +51,7 @@
     --muted: var(--gray-400);
     --hover-bg: var(--gray-700);
     --overlay: rgba(37, 43, 55, 0.7);
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A4A7AE' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   }
 }
 
@@ -53,7 +59,7 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
 }
@@ -134,7 +140,7 @@ h1 {
   color: var(--accent-text);
 }
 .btn-record:hover,
-.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover-bg); }
 
 .btn-record.recording {
   background: #d92d20;
@@ -227,7 +233,7 @@ h1 {
 .tab-btn {
   background: none;
   border: none;
-  padding: 2px 2px 10px;
+  padding: 0 2px 10px;
   font-size: 14px;
   font-weight: 600;
   color: var(--muted);
@@ -305,11 +311,26 @@ h1 {
   display: none;
 }
 
+/* Native select styled to match their select-native.tsx: appearance-none
+   with our own chevron drawn in via background-image, font-medium. */
+.file-bar select,
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+  font-weight: 500;
+}
+
 .file-bar select {
-  padding: 8px 12px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 12px;
   border-radius: 8px;
   border: none;
-  background: var(--panel);
+  background-color: var(--panel);
   color: var(--text);
   font-size: 14px;
   min-width: 240px;
@@ -367,6 +388,7 @@ h1 {
 }
 
 .modal {
+  position: relative;
   background: var(--panel);
   border-radius: 16px;
   padding: 24px;
@@ -378,8 +400,41 @@ h1 {
   animation: modal-zoom-in 200ms ease-out;
 }
 
+/* Close button (their close-button.tsx, "sm" size: size-9 = 36px square,
+   rounded-lg, p-2, hover only changes the fill — no ring/border at all). */
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 100ms linear, color 100ms linear;
+}
+
+.modal-close:hover {
+  background: var(--hover-bg);
+  color: var(--text);
+}
+
+.modal-close:focus-visible {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: 2px;
+}
+
 .modal h2 {
   margin: 0 0 8px;
+  padding-right: 40px;
   font-size: 17px;
 }
 
@@ -396,9 +451,9 @@ h1 {
 
 .field span {
   display: block;
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
 }
 
 .field small {
@@ -420,6 +475,10 @@ h1 {
   font-size: 14px;
   box-shadow: 0 0 0 1px var(--border), var(--shadow-xs);
   transition: box-shadow 100ms linear;
+}
+
+.field select {
+  padding-right: 36px;
 }
 
 /* Focus (their input.tsx isFocusWithin): the 1px neutral ring is

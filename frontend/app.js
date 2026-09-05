@@ -33,6 +33,7 @@ const settingsModal = document.getElementById("settingsModal");
 const settingsIntro = document.getElementById("settingsIntro");
 const settingsForm = document.getElementById("settingsForm");
 const settingsCancelBtn = document.getElementById("settingsCancelBtn");
+const settingsCloseBtn = document.getElementById("settingsCloseBtn");
 const settingsStatus = document.getElementById("settingsStatus");
 const cfgAnthropicKey = document.getElementById("cfgAnthropicKey");
 const cfgNotionKey = document.getElementById("cfgNotionKey");
@@ -514,6 +515,7 @@ function closeSettings() {
 
 settingsBtn.addEventListener("click", () => openSettings());
 settingsCancelBtn.addEventListener("click", closeSettings);
+settingsCloseBtn.addEventListener("click", closeSettings);
 
 settingsForm.addEventListener("submit", async (e) => {
   e.preventDefault();
