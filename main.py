@@ -1,15 +1,55 @@
 import os
-import socket
-import threading
 
-import webview
+APP_NAME = "Recap"
+ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png")
 
-from backend.app import app
+
+def apply_mac_dock_branding():
+    # Recap.app (Contents/Info.plist) now declares a real CFBundleIconFile
+    # (AppIcon.icns) — when launched as that bundle, macOS's own Launch
+    # Services already shows the correct icon immediately, no code needed,
+    # exactly like any normal app. This manual override predates that and
+    # is only still needed as a fallback for running `python3 main.py`
+    # directly (no real bundle, so it'd otherwise show Python's own icon).
+    # Applying it anyway on top of an already-correct native bundle icon
+    # forces a visible re-render with a differently-sized raw PNG — that
+    # redundant repaint is what looked like the icon "growing"/scaling.
+    try:
+        from Foundation import NSBundle
+
+        bundle = NSBundle.mainBundle()
+        if bundle.objectForInfoDictionaryKey_("CFBundleIconFile") == "AppIcon":
+            return  # Real bundle icon already showing correctly — nothing to do.
+
+        from AppKit import NSApplication, NSImage
+
+        icon = NSImage.alloc().initWithContentsOfFile_(ICON_PATH)
+        if icon is not None:
+            NSApplication.sharedApplication().setApplicationIconImage_(icon)
+
+        info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
+        if info is not None:
+            info["CFBundleName"] = APP_NAME
+    except Exception:
+        pass
+
+
+# Called here, before the slow `from backend.app import app` import below
+# (which pulls in torch/speechbrain and takes several seconds) rather than
+# after window creation, purely for the python3-main.py-direct fallback
+# case above — no effect on a real Recap.app launch, which now no-ops out
+# of this function immediately.
+apply_mac_dock_branding()
+
+import socket  # noqa: E402
+import threading  # noqa: E402
+
+import webview  # noqa: E402
+
+from backend.app import app  # noqa: E402
 
 HOST = "127.0.0.1"
 PREFERRED_PORT = 51823
-APP_NAME = "Recap"
-ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png")
 
 
 def patch_media_capture_permission():
@@ -143,26 +183,6 @@ def watch_appearance_changes(window):
         pass
 
 
-def apply_mac_dock_branding():
-    # We launch via the system's Python.app framework binary rather than a
-    # compiled app bundle of our own, so macOS otherwise shows the Dock
-    # icon/name for "Python" instead of this app. Override both at runtime.
-    try:
-        from AppKit import NSApplication, NSImage
-        from Foundation import NSBundle
-
-        icon = NSImage.alloc().initWithContentsOfFile_(ICON_PATH)
-        if icon is not None:
-            NSApplication.sharedApplication().setApplicationIconImage_(icon)
-
-        bundle = NSBundle.mainBundle()
-        info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
-        if info is not None:
-            info["CFBundleName"] = APP_NAME
-    except Exception:
-        pass
-
-
 if __name__ == "__main__":
     port = find_port()
     flask_thread = threading.Thread(target=run_flask, args=(port,), daemon=True)
@@ -184,5 +204,4 @@ if __name__ == "__main__":
         AppHelper.callAfter(watch_appearance_changes, window)
 
     window.events.shown += on_shown
-    apply_mac_dock_branding()
     webview.start()
