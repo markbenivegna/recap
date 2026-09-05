@@ -302,7 +302,12 @@ h1 {
 .tab-btn.active {
   background: var(--panel);
   color: var(--text);
-  box-shadow: var(--shadow-sm);
+  /* A soft shadow alone barely reads in dark mode (panel and hover-bg
+     are close in tone there, and the shadow itself is nearly invisible
+     on a dark backdrop) — a crisp 1px ring gives the chip a real edge
+     in both themes, same ring+shadow combo used elsewhere (buttons,
+     inputs, panels). */
+  box-shadow: 0 0 0 1px var(--border), var(--shadow-sm);
 }
 
 .tab-btn:focus-visible {
