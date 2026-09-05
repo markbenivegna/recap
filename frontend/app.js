@@ -275,6 +275,7 @@ async function startRecording() {
     if (micRecorder) micRecorder.start();
     if (systemRecorder) systemRecorder.start();
     recording = true;
+    emptyEl.hidden = true;
     recordingStart = Date.now();
     recordBtn.textContent = "Stop";
     recordBtn.classList.add("recording");

@@ -100,9 +100,9 @@ h1 {
 }
 
 .app-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: block;
 }
 
@@ -229,6 +229,10 @@ h1 {
   padding: 96px 20px;
 }
 
+.empty-state[hidden] {
+  display: none;
+}
+
 .empty-state-icon {
   width: 56px;
   height: 56px;
@@ -257,7 +261,7 @@ h1 {
 }
 
 .meeting-title {
-  font-size: 17px;
+  font-size: 22px;
   font-weight: 600;
   margin: 0 0 16px;
 }
