@@ -586,6 +586,11 @@ h1 {
   line-height: 1.4;
 }
 
+.field small a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .field input,
 .field select {
   width: 100%;

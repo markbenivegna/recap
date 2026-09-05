@@ -59,6 +59,6 @@ if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, args=(port,), daemon=True)
     flask_thread.start()
 
-    webview.create_window(APP_NAME, f"http://{HOST}:{port}", width=1000, height=800, min_size=(700, 600))
+    webview.create_window(APP_NAME, f"http://{HOST}:{port}", width=850, height=600, min_size=(700, 500))
     apply_mac_dock_branding()
     webview.start()
