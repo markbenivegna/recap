@@ -75,7 +75,7 @@ body {
 .app {
   max-width: 900px;
   margin: 0 auto;
-  padding: 20px 32px 32px;
+  padding: 8px 32px 32px;
   min-height: 100vh;
 }
 
@@ -86,7 +86,7 @@ body {
   gap: 16px;
   flex-wrap: wrap;
   border-bottom: 1px solid var(--border);
-  padding-bottom: 20px;
+  padding-bottom: 8px;
   margin-bottom: 24px;
 }
 
