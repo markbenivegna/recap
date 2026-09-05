@@ -413,8 +413,14 @@ h1 {
 /* Utility icon button (their button-utility.tsx, "sm" size): rounded-md
    (6px) + p-1.5 (6px padding) around a size-5 (20px) icon — their real,
    literal spec, not padding tuned to match our other buttons' height. */
+/* Sized to match the height of the buttons next to it in the toolbar
+   (their button-utility.tsx is 32px, which looked mismatched here) —
+   only the smaller 6px radius (vs. 8px on regular buttons) is kept from
+   their actual utility-button spec. */
 .btn-icon {
-  padding: 6px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
