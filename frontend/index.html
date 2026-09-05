@@ -21,6 +21,7 @@
         <span class="waveform-bar"></span>
         <span class="waveform-bar"></span>
       </div>
+      <span id="recordingDot" class="recording-dot" hidden></span>
       <span id="timer" class="timer" hidden>00:00</span>
       <button id="newRecordingBtn" class="btn btn-primary" hidden>New Recording</button>
       <button id="recordBtn" class="btn btn-record">Record</button>
@@ -37,15 +38,62 @@
     </div>
   </header>
 
+  <div id="usageAlertBanner" class="usage-alert-banner" hidden>
+    <span id="usageAlertBannerText"></span>
+    <button id="usageAlertBannerBtn" type="button" class="usage-alert-banner-link">Manage in Settings</button>
+  </div>
+
   <div id="settingsModal" class="modal-overlay" hidden>
     <div class="modal">
-      <button id="settingsCloseBtn" class="modal-close" type="button" aria-label="Close">&times;</button>
-      <div class="modal-body">
+      <div class="modal-header">
         <h2 id="settingsHeading">Settings</h2>
+        <button id="settingsCloseBtn" class="modal-close" type="button" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6 6 18"></path>
+            <path d="M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
         <p id="settingsIntro" class="modal-intro" hidden>
           Add your API keys to get started — nothing here leaves your Mac except direct calls to Anthropic/Notion.
         </p>
         <form id="settingsForm">
+          <h3 class="settings-section-title">Usage &amp; billing</h3>
+          <div class="field">
+            <small>
+              Estimated spend via Recap, tracked across every session from actual token usage —
+              not your real Anthropic balance (no API exposes that for a standard key).
+            </small>
+            <div class="usage-card">
+              <div class="usage-card-header">
+                <span class="usage-card-label">Spend via Recap</span>
+                <span id="usagePill" class="usage-pill">No limit set</span>
+              </div>
+              <div class="usage-card-body">
+                <div class="usage-card-main">
+                  <div id="usageValueText" class="usage-card-amount">$0.00</div>
+                  <div id="usageSubtext" class="usage-card-sub">No alert threshold set</div>
+                </div>
+                <svg class="usage-ring" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+                  <circle class="usage-ring-track" cx="32" cy="32" r="27" fill="none" stroke-width="5"></circle>
+                  <circle id="usageRingFill" class="usage-ring-fill" cx="32" cy="32" r="27" fill="none" stroke-width="5" stroke-linecap="round"></circle>
+                </svg>
+              </div>
+              <button type="button" id="usageResetBtn" class="usage-reset-btn">Reset count</button>
+            </div>
+            <a class="usage-billing-link" href="https://console.anthropic.com/settings/billing" target="_blank">Manage billing on Anthropic Console →</a>
+          </div>
+          <label class="field">
+            <span>Alert threshold</span>
+            <small>Show a warning above once estimated spend passes this amount. Leave blank to disable.</small>
+            <div class="currency-input">
+              <span class="currency-symbol">$</span>
+              <input type="number" id="cfgSpendThreshold" placeholder="5" step="1" min="0" inputmode="numeric" />
+            </div>
+          </label>
+
+          <h3 class="settings-section-title">API keys</h3>
           <label class="field">
             <span>Anthropic API key</span>
             <small><a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys</small>
@@ -55,6 +103,37 @@
             <span>Notion API key</span>
             <small><a href="https://www.notion.so/my-integrations" target="_blank">notion.so/my-integrations</a> → New integration. Then connect it to specific pages from within Notion itself (page's <code>...</code> menu → Connections).</small>
             <input type="password" id="cfgNotionKey" autocomplete="off" />
+          </label>
+
+          <h3 class="settings-section-title">Recording</h3>
+          <label class="field">
+            <span>Speaker detection sensitivity</span>
+            <small>
+              Lower catches more distinct speakers (can split one voice into two). Higher merges
+              similar voices together (can merge two speakers into one). Applies to your next recording.
+            </small>
+            <div class="slider-field">
+              <input
+                type="range"
+                id="cfgDiarizationThreshold"
+                min="0.3"
+                max="1"
+                step="0.1"
+                value="0.7"
+                list="diarizationThresholdTicks"
+              />
+              <datalist id="diarizationThresholdTicks">
+                <option value="0.3"></option>
+                <option value="0.4"></option>
+                <option value="0.5"></option>
+                <option value="0.6"></option>
+                <option value="0.7"></option>
+                <option value="0.8"></option>
+                <option value="0.9"></option>
+                <option value="1"></option>
+              </datalist>
+              <span id="cfgDiarizationThresholdValue" class="slider-value">0.70</span>
+            </div>
           </label>
           <label class="field">
             <span>Whisper model size</span>
@@ -77,14 +156,11 @@
           </label>
         </form>
       </div>
-      <div class="modal-footer">
-        <span id="settingsStatus" class="file-status"></span>
-        <span class="modal-actions">
-          <button type="button" id="settingsCancelBtn" class="btn btn-secondary">Cancel</button>
-          <button type="submit" form="settingsForm" class="btn btn-primary">Save</button>
-        </span>
-      </div>
     </div>
+  </div>
+
+  <div id="toast" class="toast" hidden>
+    <span id="toastText"></span>
   </div>
 
   <div id="status" class="status" hidden>
@@ -128,9 +204,9 @@
 
       <footer class="file-bar">
         <span id="notionFileGroup" class="notion-file-group" hidden>
-          <span class="split-btn">
+          <span class="split-btn split-btn-disabled">
             <button id="fileBtn" class="btn btn-primary split-btn-main" disabled>File to Notion</button>
-            <select id="notionSelect" class="split-btn-select" aria-label="Notion destination page">
+            <select id="notionSelect" class="split-btn-select" aria-label="Notion destination page" disabled>
               <option value="">Loading pages...</option>
             </select>
             <span class="split-btn-caret" aria-hidden="true">

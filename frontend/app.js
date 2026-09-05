@@ -1,6 +1,7 @@
 const recordBtn = document.getElementById("recordBtn");
 const fileInput = document.getElementById("fileInput");
 const timerEl = document.getElementById("timer");
+const recordingDotEl = document.getElementById("recordingDot");
 const waveformEl = document.getElementById("waveform");
 const waveformBars = waveformEl.querySelectorAll(".waveform-bar");
 const statusEl = document.getElementById("status");
@@ -14,6 +15,17 @@ const notesContent = document.getElementById("notesContent");
 const transcriptContent = document.getElementById("transcriptContent");
 const notionSelect = document.getElementById("notionSelect");
 const fileBtn = document.getElementById("fileBtn");
+const splitBtn = fileBtn.closest(".split-btn");
+
+// Drives the caret/select's disabled look via a JS-toggled class rather
+// than a CSS :has() selector — :has() should work, but a WebKit-specific
+// rendering quirk kept the caret looking enabled even when the button
+// itself was disabled, so this sidesteps that dependency entirely.
+function setFileBtnDisabled(disabled) {
+  fileBtn.disabled = disabled;
+  notionSelect.disabled = disabled;
+  splitBtn.classList.toggle("split-btn-disabled", disabled);
+}
 const downloadBtn = document.getElementById("downloadBtn");
 const fileStatus = document.getElementById("fileStatus");
 const newRecordingBtn = document.getElementById("newRecordingBtn");
@@ -32,14 +44,30 @@ const settingsBtn = document.getElementById("settingsBtn");
 const settingsModal = document.getElementById("settingsModal");
 const settingsIntro = document.getElementById("settingsIntro");
 const settingsForm = document.getElementById("settingsForm");
-const settingsCancelBtn = document.getElementById("settingsCancelBtn");
 const settingsCloseBtn = document.getElementById("settingsCloseBtn");
-const settingsStatus = document.getElementById("settingsStatus");
+const toastEl = document.getElementById("toast");
+const toastTextEl = document.getElementById("toastText");
 const cfgAnthropicKey = document.getElementById("cfgAnthropicKey");
 const cfgNotionKey = document.getElementById("cfgNotionKey");
 const cfgWhisperSize = document.getElementById("cfgWhisperSize");
 const cfgVocabHints = document.getElementById("cfgVocabHints");
 const cfgOutputDevice = document.getElementById("cfgOutputDevice");
+const cfgSpendThreshold = document.getElementById("cfgSpendThreshold");
+const cfgDiarizationThreshold = document.getElementById("cfgDiarizationThreshold");
+const cfgDiarizationThresholdValue = document.getElementById("cfgDiarizationThresholdValue");
+const usageValueText = document.getElementById("usageValueText");
+const usagePill = document.getElementById("usagePill");
+const usageRingFill = document.getElementById("usageRingFill");
+const usageSubtext = document.getElementById("usageSubtext");
+const usageAlertBanner = document.getElementById("usageAlertBanner");
+const usageAlertBannerText = document.getElementById("usageAlertBannerText");
+const usageAlertBannerBtn = document.getElementById("usageAlertBannerBtn");
+const usageResetBtn = document.getElementById("usageResetBtn");
+
+const USAGE_RING_RADIUS = 27;
+const USAGE_RING_CIRCUMFERENCE = 2 * Math.PI * USAGE_RING_RADIUS;
+usageRingFill.style.strokeDasharray = `${USAGE_RING_CIRCUMFERENCE}`;
+usageRingFill.style.strokeDashoffset = `${USAGE_RING_CIRCUMFERENCE}`;
 
 let mediaRecorder = null;
 let micRecorder = null;
@@ -62,6 +90,17 @@ function setStatus(message, isError = false, showSpinner = false) {
   statusTextEl.textContent = message;
   statusEl.classList.toggle("error", isError);
   statusSpinnerEl.hidden = !showSpinner;
+}
+
+let toastTimer = null;
+function showToast(message, isError = false) {
+  toastTextEl.textContent = message;
+  toastEl.classList.toggle("error", isError);
+  toastEl.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toastEl.hidden = true;
+  }, 2500);
 }
 
 function formatTimer(ms) {
@@ -193,7 +232,16 @@ async function startRecording() {
       // Non-fatal — recording still works, just without the auto-switch.
     }
 
-    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // echoCancellation/noiseSuppression/autoGainControl default to true,
+    // which engages a "voice processing" audio unit on macOS — once real
+    // speech is detected on this stream, that can duck/suppress OTHER
+    // concurrently-open audio inputs (like the separate BlackHole capture
+    // below) for the rest of the session, to prevent echo. Disabling them
+    // keeps this a plain, unprocessed capture that doesn't interfere with
+    // the second device.
+    const micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    });
     activeStreams = [micStream];
 
     let usingSystemAudio = false;
@@ -204,7 +252,7 @@ async function startRecording() {
     if (blackHoleId) {
       try {
         systemStream = await navigator.mediaDevices.getUserMedia({
-          audio: { deviceId: { exact: blackHoleId } },
+          audio: { deviceId: { exact: blackHoleId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
         });
         activeStreams.push(systemStream);
 
@@ -279,6 +327,8 @@ async function startRecording() {
     recordingStart = Date.now();
     recordBtn.textContent = "Stop";
     recordBtn.classList.add("recording");
+    uploadLabel.hidden = true;
+    recordingDotEl.hidden = false;
     timerEl.hidden = false;
     timerInterval = setInterval(() => {
       timerEl.textContent = formatTimer(Date.now() - recordingStart);
@@ -300,6 +350,7 @@ function stopRecording() {
     recordBtn.textContent = "Record";
     recordBtn.classList.remove("recording");
     clearInterval(timerInterval);
+    recordingDotEl.hidden = true;
     timerEl.hidden = true;
   }
 }
@@ -337,7 +388,7 @@ function resetToNewRecording() {
   notesContent.textContent = "";
   transcriptContent.innerHTML = "";
   notionSelect.innerHTML = '<option value="">Loading pages...</option>';
-  fileBtn.disabled = true;
+  setFileBtnDisabled(true);
   fileStatus.textContent = "";
   switchTab("summary");
   setStatus("");
@@ -425,6 +476,7 @@ async function generateSummary(transcriptText) {
     setStatus("");
     newRecordingBtn.hidden = false;
     if (notionConfigured) loadNotionPages();
+    checkUsageAlert();
   } catch (err) {
     summaryContent.textContent = "";
     notesContent.textContent = "";
@@ -440,8 +492,7 @@ function updateFileBtnLabel() {
 
 async function loadNotionPages() {
   notionSelect.innerHTML = '<option value="">Loading pages...</option>';
-  notionSelect.disabled = true;
-  fileBtn.disabled = true;
+  setFileBtnDisabled(true);
   try {
     const res = await fetch("/api/notion/pages");
     const data = await res.json();
@@ -458,15 +509,14 @@ async function loadNotionPages() {
       opt.textContent = page.type === "database" ? `${page.title} (database)` : page.title;
       notionSelect.appendChild(opt);
     });
-    notionSelect.disabled = data.pages.length === 0;
-    fileBtn.disabled = data.pages.length === 0;
+    setFileBtnDisabled(data.pages.length === 0);
     if (data.pages.length === 0) {
       notionSelect.innerHTML = '<option value="">No pages shared</option>';
     }
     updateFileBtnLabel();
   } catch (err) {
     notionSelect.innerHTML = '<option value="">Unavailable</option>';
-    notionSelect.disabled = true;
+    setFileBtnDisabled(true);
     fileStatus.textContent = err.message;
   }
 }
@@ -475,7 +525,7 @@ notionSelect.addEventListener("change", updateFileBtnLabel);
 
 fileBtn.addEventListener("click", async () => {
   if (!notionSelect.value || !lastResult) return;
-  fileBtn.disabled = true;
+  setFileBtnDisabled(true);
   fileStatus.textContent = "Filing to Notion...";
   const selectedOption = notionSelect.options[notionSelect.selectedIndex];
   try {
@@ -497,18 +547,75 @@ fileBtn.addEventListener("click", async () => {
     if (data.url) {
       const link = document.createElement("a");
       link.href = data.url;
-      link.textContent = " Open page";
+      link.textContent = "Open page";
       link.target = "_blank";
       fileStatus.appendChild(link);
     }
   } catch (err) {
     fileStatus.textContent = `Error: ${err.message}`;
-    fileBtn.disabled = false;
+    setFileBtnDisabled(false);
   }
 });
 
+function computeUsageStatus(data) {
+  const cost = data.total_cost_usd || 0;
+  const threshold = data.alert_threshold;
+  const hasThreshold = typeof threshold === "number" && threshold > 0;
+  const pct = hasThreshold ? Math.min(100, (cost / threshold) * 100) : 0;
+  const over = hasThreshold && cost >= threshold;
+  const near = hasThreshold && !over && pct >= 80;
+  return { cost, threshold, hasThreshold, pct, near, over };
+}
+
+async function fetchUsage() {
+  const res = await fetch("/api/usage");
+  return res.json();
+}
+
+async function loadUsageDisplay() {
+  try {
+    const data = await fetchUsage();
+    const { cost, threshold, hasThreshold, pct, near, over } = computeUsageStatus(data);
+    usageValueText.textContent = `$${cost.toFixed(2)}`;
+
+    usageRingFill.style.strokeDashoffset = `${USAGE_RING_CIRCUMFERENCE * (1 - pct / 100)}`;
+    usageRingFill.classList.toggle("over-threshold", over);
+    usageRingFill.classList.toggle("near-threshold", near);
+    usagePill.classList.toggle("over-threshold", over);
+    usagePill.classList.toggle("near-threshold", near);
+    usagePill.textContent = hasThreshold ? `${Math.round(pct)}% used` : "No limit set";
+    const summaryCount = data.call_count || 0;
+    const summaryCountText = `${summaryCount} ${summaryCount === 1 ? "summary" : "summaries"}`;
+    let statusSuffix = "";
+    if (over) statusSuffix = " — exceeded";
+    else if (near) statusSuffix = " — approaching";
+    usageSubtext.textContent = hasThreshold
+      ? `${summaryCountText} so far, $${threshold.toFixed(2)} threshold${statusSuffix}`
+      : `${summaryCountText} so far`;
+  } catch (err) {
+    usageValueText.textContent = "—";
+  }
+}
+
+async function checkUsageAlert() {
+  try {
+    const data = await fetchUsage();
+    const { threshold, near, over } = computeUsageStatus(data);
+    if (!near && !over) {
+      usageAlertBanner.hidden = true;
+      return;
+    }
+    usageAlertBanner.hidden = false;
+    usageAlertBanner.classList.toggle("over-threshold", over);
+    usageAlertBannerText.textContent = over
+      ? `You've passed your $${threshold.toFixed(2)} spend alert threshold.`
+      : `Approaching your $${threshold.toFixed(2)} spend alert threshold.`;
+  } catch (err) {
+    // Non-fatal — the banner just won't show.
+  }
+}
+
 async function openSettings({ isFirstRun = false } = {}) {
-  settingsStatus.textContent = "";
   settingsIntro.hidden = !isFirstRun;
   try {
     const res = await fetch("/api/settings");
@@ -518,10 +625,15 @@ async function openSettings({ isFirstRun = false } = {}) {
     cfgWhisperSize.value = data.WHISPER_MODEL_SIZE || "small";
     cfgVocabHints.value = data.VOCABULARY_HINTS || "";
     cfgOutputDevice.value = data.RECORDING_OUTPUT_DEVICE || "";
+    cfgSpendThreshold.value = data.SPEND_ALERT_THRESHOLD || "";
+    cfgDiarizationThreshold.value = data.DIARIZATION_THRESHOLD || "0.7";
+    cfgDiarizationThresholdValue.textContent = Number(cfgDiarizationThreshold.value).toFixed(2);
+    loadUsageDisplay();
   } catch (err) {
-    settingsStatus.textContent = `Could not load current settings: ${err.message}`;
+    showToast(`Could not load current settings: ${err.message}`, true);
   }
   settingsModal.hidden = false;
+  settingsModal.querySelector(".modal-body").scrollTop = 0;
 }
 
 function closeSettings() {
@@ -529,12 +641,14 @@ function closeSettings() {
 }
 
 settingsBtn.addEventListener("click", () => openSettings());
-settingsCancelBtn.addEventListener("click", closeSettings);
 settingsCloseBtn.addEventListener("click", closeSettings);
 
-settingsForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  settingsStatus.textContent = "Saving...";
+// No Save button — each field saves itself as soon as you leave it (or,
+// for a select, as soon as you pick something), like any other native
+// settings screen. The toast is the only confirmation that a save happened.
+settingsForm.addEventListener("submit", (e) => e.preventDefault());
+
+async function saveSettings() {
   try {
     const res = await fetch("/api/settings", {
       method: "POST",
@@ -545,17 +659,38 @@ settingsForm.addEventListener("submit", async (e) => {
         WHISPER_MODEL_SIZE: cfgWhisperSize.value,
         VOCABULARY_HINTS: cfgVocabHints.value.trim(),
         RECORDING_OUTPUT_DEVICE: cfgOutputDevice.value.trim(),
+        SPEND_ALERT_THRESHOLD: cfgSpendThreshold.value.trim(),
+        DIARIZATION_THRESHOLD: cfgDiarizationThreshold.value,
       }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Save failed");
     applyNotionConfigured(Boolean(cfgNotionKey.value.trim()));
     if (notionConfigured && lastResult && resultsEl.hidden === false) loadNotionPages();
-    settingsStatus.textContent = "Saved. Whisper/vocabulary changes apply next time you restart Recap.";
-    setTimeout(closeSettings, 1500);
+    loadUsageDisplay();
+    showToast("Settings saved");
   } catch (err) {
-    settingsStatus.textContent = `Error: ${err.message}`;
+    showToast(`Error: ${err.message}`, true);
   }
+}
+
+[
+  cfgAnthropicKey,
+  cfgNotionKey,
+  cfgWhisperSize,
+  cfgVocabHints,
+  cfgOutputDevice,
+  cfgSpendThreshold,
+  cfgDiarizationThreshold,
+].forEach((el) => {
+  el.addEventListener("change", saveSettings);
+});
+
+// Live-update the numeric label while dragging — "change" (used above for
+// autosave) only fires once you let go, but the label should track the
+// thumb in real time.
+cfgDiarizationThreshold.addEventListener("input", () => {
+  cfgDiarizationThresholdValue.textContent = Number(cfgDiarizationThreshold.value).toFixed(2);
 });
 
 // First-run: if the essential keys aren't set yet, open Settings
@@ -574,7 +709,23 @@ settingsForm.addEventListener("submit", async (e) => {
   } catch (err) {
     // Non-fatal — settings just won't auto-open.
   }
+  checkUsageAlert();
 })();
+
+usageAlertBannerBtn.addEventListener("click", () => openSettings());
+
+usageResetBtn.addEventListener("click", async () => {
+  if (!confirm("Reset tracked spend and summary count back to $0? This can't be undone.")) return;
+  try {
+    const res = await fetch("/api/usage/reset", { method: "POST" });
+    if (!res.ok) throw new Error("Reset failed");
+    loadUsageDisplay();
+    checkUsageAlert();
+    showToast("Usage reset");
+  } catch (err) {
+    showToast(`Error: ${err.message}`, true);
+  }
+});
 
 downloadBtn.addEventListener("click", async () => {
   if (!lastResult) return;
