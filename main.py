@@ -89,6 +89,15 @@ if __name__ == "__main__":
     window = webview.create_window(
         APP_NAME, f"http://{HOST}:{port}", width=850, height=600, min_size=(700, 500), background_color="#FFFFFF"
     )
-    window.events.shown += lambda: hide_titlebar_text(window)
+
+    def on_shown():
+        # events.shown fires on a background thread, but AppKit requires
+        # any NSWindow changes to happen on the main thread (confirmed by
+        # an NSInternalInconsistencyException when called directly here).
+        from PyObjCTools import AppHelper
+
+        AppHelper.callAfter(hide_titlebar_text, window)
+
+    window.events.shown += on_shown
     apply_mac_dock_branding()
     webview.start()
