@@ -76,6 +76,12 @@ def hide_titlebar_text(window):
             [NSAppearanceNameAqua, NSAppearanceNameDarkAqua]
         )
         is_dark = best_match == NSAppearanceNameDarkAqua
+        print(
+            f"[titlebar-debug] window.effectiveAppearance().name() = {native.effectiveAppearance().name()!r}, "
+            f"NSApp.effectiveAppearance().name() = {__import__('AppKit').NSApplication.sharedApplication().effectiveAppearance().name()!r}, "
+            f"best_match = {best_match!r}, is_dark = {is_dark}",
+            flush=True,
+        )
         native.setBackgroundColor_(NSColor.blackColor() if is_dark else NSColor.whiteColor())
     except Exception:
         pass
