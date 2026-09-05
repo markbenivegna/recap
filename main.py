@@ -34,6 +34,27 @@ def run_flask(port):
     app.run(host=HOST, port=port, debug=False, use_reloader=False, threaded=True)
 
 
+def sync_titlebar_color(window):
+    # Match the native window's background exactly to our page background
+    # (plain black/white, not windowBackgroundColor() — that's a
+    # slightly-off system gray in each mode, not a true match, so a seam
+    # reappears in a different shade if used here). Re-run any time the
+    # appearance actually changes, not just once at launch — macOS's
+    # "Automatic" appearance setting switches light/dark on its own
+    # schedule while the app may already be running.
+    try:
+        from AppKit import NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSColor
+
+        native = window.native
+        best_match = native.effectiveAppearance().bestMatchFromAppearancesWithNames_(
+            [NSAppearanceNameAqua, NSAppearanceNameDarkAqua]
+        )
+        is_dark = best_match == NSAppearanceNameDarkAqua
+        native.setBackgroundColor_(NSColor.blackColor() if is_dark else NSColor.whiteColor())
+    except Exception:
+        pass
+
+
 def hide_titlebar_text(window):
     # Keep the native close/minimize/zoom buttons but remove the title
     # string and the visually distinct bar behind them, so the window
@@ -57,32 +78,26 @@ def hide_titlebar_text(window):
         # shows, permanently, with none of the usual active/inactive
         # dimming. Clear it so our own content shows through instead.
         native.contentView().superview().subviews().lastObject().setBackgroundColor_(NSColor.clearColor())
+    except Exception:
+        pass
 
-        # The window itself is created with a hardcoded white background
-        # (pywebview's background_color, default '#FFFFFF' either way).
-        # That's invisible in light mode, but in dark mode it's what was
-        # showing through as a stray white bar up top — our own dark CSS
-        # only covers the WKWebView's content area, not the native window
-        # behind/around it.
-        #
-        # windowBackgroundColor looked like the obvious fix but isn't an
-        # exact match for our page background in either mode (it's a
-        # slightly-off system gray, not true #fff/#000), so the seam just
-        # came back in a different color. Match our CSS exactly instead —
-        # it's pure black/white on both sides, so plain black/white works.
-        from AppKit import NSAppearanceNameAqua, NSAppearanceNameDarkAqua
+    sync_titlebar_color(window)
 
-        best_match = native.effectiveAppearance().bestMatchFromAppearancesWithNames_(
-            [NSAppearanceNameAqua, NSAppearanceNameDarkAqua]
+
+def watch_appearance_changes(window):
+    # AppleInterfaceThemeChangedNotification fires whenever the effective
+    # appearance actually changes — a manual toggle, or macOS's own
+    # "Automatic" schedule flipping it while the app is already running.
+    try:
+        from Foundation import NSDistributedNotificationCenter, NSOperationQueue
+        from PyObjCTools import AppHelper
+
+        def on_change(_notification):
+            AppHelper.callAfter(sync_titlebar_color, window)
+
+        NSDistributedNotificationCenter.defaultCenter().addObserverForName_object_queue_usingBlock_(
+            "AppleInterfaceThemeChangedNotification", None, NSOperationQueue.mainQueue(), on_change
         )
-        is_dark = best_match == NSAppearanceNameDarkAqua
-        print(
-            f"[titlebar-debug] window.effectiveAppearance().name() = {native.effectiveAppearance().name()!r}, "
-            f"NSApp.effectiveAppearance().name() = {__import__('AppKit').NSApplication.sharedApplication().effectiveAppearance().name()!r}, "
-            f"best_match = {best_match!r}, is_dark = {is_dark}",
-            flush=True,
-        )
-        native.setBackgroundColor_(NSColor.blackColor() if is_dark else NSColor.whiteColor())
     except Exception:
         pass
 
@@ -123,6 +138,7 @@ if __name__ == "__main__":
         from PyObjCTools import AppHelper
 
         AppHelper.callAfter(hide_titlebar_text, window)
+        AppHelper.callAfter(watch_appearance_changes, window)
 
     window.events.shown += on_shown
     apply_mac_dock_branding()
