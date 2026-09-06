@@ -9,6 +9,8 @@ const statusTextEl = document.getElementById("statusText");
 const statusSpinnerEl = document.getElementById("statusSpinner");
 const emptyEl = document.getElementById("empty");
 const recordingAnimationEl = document.getElementById("recordingAnimation");
+const recordingAnimationCanvas = document.getElementById("recordingAnimationCanvas");
+const recordingAnimationTextEl = document.getElementById("recordingAnimationText");
 const resultsEl = document.getElementById("results");
 const meetingTitleEl = document.getElementById("meetingTitle");
 const summaryContent = document.getElementById("summaryContent");
@@ -152,14 +154,15 @@ function driveRecordingAnimation() {
   recordingLottie.goToAndStop((elapsed / durationMs) * totalFrames, true);
 }
 
-function playRecordingAnimation() {
+function playRecordingAnimation(subtext) {
   recordingAnimationEl.hidden = false;
+  recordingAnimationTextEl.textContent = subtext;
   recordingAnimationStart = performance.now();
   if (recordingAnimationTimer) clearInterval(recordingAnimationTimer);
   recordingAnimationTimer = setInterval(driveRecordingAnimation, 1000 / 30);
   if (recordingLottie) return;
   recordingLottie = lottie.loadAnimation({
-    container: recordingAnimationEl,
+    container: recordingAnimationCanvas,
     renderer: "svg",
     loop: false,
     autoplay: false,
@@ -169,6 +172,7 @@ function playRecordingAnimation() {
 
 function stopRecordingAnimation() {
   recordingAnimationEl.hidden = true;
+  recordingAnimationTextEl.textContent = "";
   if (recordingAnimationTimer) {
     clearInterval(recordingAnimationTimer);
     recordingAnimationTimer = null;
@@ -371,7 +375,7 @@ async function startRecording() {
     if (systemRecorder) systemRecorder.start();
     recording = true;
     emptyEl.hidden = true;
-    playRecordingAnimation();
+    playRecordingAnimation(usingSystemAudio ? "Capturing your mic and system audio." : "Capturing your mic.");
     recordingStart = Date.now();
     recordBtn.textContent = "Stop";
     recordBtn.classList.add("recording");
@@ -382,7 +386,7 @@ async function startRecording() {
       timerEl.textContent = formatTimer(Date.now() - recordingStart);
     }, 250);
     startWaveform(mixedStream);
-    setStatus(usingSystemAudio ? "Recording (mic + system audio)..." : "Recording...");
+    setStatus("");
   } catch (err) {
     setStatus(`Could not access microphone: ${err.message}`, true);
   }
