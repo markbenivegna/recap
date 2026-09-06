@@ -345,10 +345,16 @@ h1 {
   display: none;
 }
 
+/* The artwork itself (the actual sticky notes) only fills the middle ~50%
+   of this box vertically — the rest is empty space the source animation
+   reserves for the notes to rotate/fan out into without clipping. A plain
+   margin-bottom here would leave the title/text sitting way below the
+   visible artwork. Pull them up to sit just under the real visible edge
+   instead. */
 .recording-animation-canvas {
   width: 320px;
   height: 320px;
-  margin-bottom: 8px;
+  margin-bottom: -45px;
 }
 
 .recording-animation-canvas svg {
