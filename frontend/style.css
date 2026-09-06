@@ -330,11 +330,15 @@ h1 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Anchored near the top with a fixed offset rather than centered with a
+     padding-bottom bias (the .empty-state trick) — that trick needs
+     disproportionate tuning once the animation itself is this large, and
+     drifts around at different window heights since it's vh-based. A fixed
+     top offset stays put regardless of viewport size. */
+  justify-content: flex-start;
   color: var(--muted);
   text-align: center;
-  padding: 40px 20px;
-  padding-bottom: 14vh;
+  padding: 48px 20px 40px;
 }
 
 .recording-animation[hidden] {
@@ -342,8 +346,8 @@ h1 {
 }
 
 .recording-animation-canvas {
-  width: 220px;
-  height: 220px;
+  width: 320px;
+  height: 320px;
   margin-bottom: 8px;
 }
 
