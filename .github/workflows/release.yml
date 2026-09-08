@@ -9,6 +9,11 @@ on:
     tags:
       - "v*"
 
+# The default GITHUB_TOKEN is read-only unless a workflow explicitly asks
+# for more — needed here for `gh release create` to actually publish.
+permissions:
+  contents: write
+
 jobs:
   build:
     # GitHub-hosted macOS runners are Apple Silicon (arm64) and come with
