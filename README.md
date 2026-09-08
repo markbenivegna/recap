@@ -171,7 +171,10 @@ some of them are good. A few reasons I ended up building my own instead:
   read, not a wall of undifferentiated text.
 - Mostly, I just wanted to know exactly what it does, because I wrote it.
 
-If you just want something that works today without touching a terminal,
+There's still a real trade-off: you're managing your own Anthropic API key
+and paying per meeting yourself (typically a few cents), there's no
+onboarding flow or support line, and it's an unsigned app built by one
+person in their spare time, not a company. If none of that sounds worth it,
 a paid app is probably the better trade. This one's for people who'd rather
 own the thing.
 
