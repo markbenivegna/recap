@@ -94,6 +94,34 @@ def patch_media_capture_permission():
         pass
 
 
+def patch_app_reopen():
+    # Once the menu bar icon can leave the app running with the window
+    # hidden (via window.hide()'s orderOut_, not real miniaturization),
+    # clicking the Dock icon doesn't bring it back on its own — orderOut_
+    # takes the window out of AppKit's normal "reopen on Dock click"
+    # bookkeeping the way genuine miniaturizing to the Dock does. pywebview's
+    # own AppDelegate doesn't implement
+    # applicationShouldHandleReopen:hasVisibleWindows: at all, so nothing
+    # currently handles that Dock click. Same subclass-before-create_window
+    # technique as patch_media_capture_permission() above, for the same
+    # reason (see its own comment).
+    try:
+        from webview.platforms.cocoa import BrowserView
+        from Foundation import NO
+
+        from backend import menubar
+
+        class ReopenAwareAppDelegate(BrowserView.AppDelegate):
+            def applicationShouldHandleReopen_hasVisibleWindows_(self, app, has_visible_windows):
+                if not has_visible_windows:
+                    menubar.show_window()
+                return NO  # we've handled showing the window ourselves
+
+        BrowserView.AppDelegate = ReopenAwareAppDelegate
+    except Exception:
+        pass
+
+
 def find_port():
     # Prefer a fixed port so the app's origin (http://127.0.0.1:<port>) stays
     # the same across launches — WKWebView caches microphone permission per
@@ -190,6 +218,7 @@ if __name__ == "__main__":
     flask_thread.start()
 
     patch_media_capture_permission()
+    patch_app_reopen()
 
     # Restore the last position/size, but only if it's still within some
     # currently-connected screen's bounds — a saved position from a monitor
