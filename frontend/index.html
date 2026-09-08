@@ -59,7 +59,7 @@
           <button type="button" class="settings-nav-item active" data-category="general">General</button>
           <button type="button" class="settings-nav-item" data-category="recording">Recording</button>
           <button type="button" class="settings-nav-item" data-category="api-keys">API Keys</button>
-          <button type="button" class="settings-nav-item" data-category="usage">Usage &amp; Billing</button>
+          <button type="button" class="settings-nav-item" data-category="usage">Usage</button>
         </nav>
         <div class="settings-panels">
           <p id="settingsIntro" class="modal-intro" hidden>
@@ -149,10 +149,6 @@
 
             <section class="settings-panel" data-category="usage">
               <div class="field">
-                <small>
-                  Estimated spend via Recap, tracked across every session from actual token usage —
-                  not your real Anthropic balance (no API exposes that for a standard key).
-                </small>
                 <div class="usage-card">
                   <div class="usage-card-header">
                     <span class="usage-card-label">Spend via Recap</span>
@@ -170,6 +166,10 @@
                   </div>
                   <button type="button" id="usageResetBtn" class="usage-reset-btn">Reset count</button>
                 </div>
+                <small>
+                  Estimated spend via Recap, tracked across every session from actual token usage —
+                  not your real Anthropic balance (no API exposes that for a standard key).
+                </small>
                 <a class="usage-billing-link" href="https://console.anthropic.com/settings/billing" target="_blank">Manage billing on Anthropic Console →</a>
               </div>
               <label class="field">

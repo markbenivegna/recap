@@ -1029,6 +1029,7 @@ h1 {
   background: var(--panel);
   padding: 20px;
   box-shadow: var(--shadow-xs);
+  margin-bottom: 12px;
 }
 
 .usage-card-header {
