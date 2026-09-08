@@ -709,6 +709,16 @@ h1 {
   animation: modal-zoom-in 200ms ease-out;
 }
 
+/* Wider than the base .modal — needs room for the sidebar alongside the
+   fields, not just a single scrolling column. A fixed height (not the base
+   .modal's shrink-to-fit max-height) matters here specifically: each
+   category's content is a different height, and without a fixed height the
+   whole modal would visibly grow/shrink every time you switch categories. */
+.modal-settings {
+  max-width: 640px;
+  height: min(560px, 85vh);
+}
+
 /* Header stays fixed above the scrolling fields — its own background
    covers content scrolling up underneath it. */
 .modal-header {
@@ -770,17 +780,130 @@ h1 {
   color: var(--muted);
 }
 
-.settings-section-title {
-  margin: 20px 0 16px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
+/* Sidebar of settings categories + a scrolling panel area, replacing the
+   single long scrolling form (same idea as this app's own
+   Summary/Notes/Transcript .tabs, just vertical) — a category's fields
+   only exist in the DOM as one .settings-panel, shown/hidden via .active,
+   same pattern as .tab-panel. */
+.settings-body {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
-.settings-section-title:first-child {
-  margin-top: 0;
+.settings-nav {
+  flex-shrink: 0;
+  width: 152px;
+  padding: 16px 8px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-right: 1px solid var(--border);
+}
+
+.settings-nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color 100ms linear, color 100ms linear;
+}
+
+.settings-nav-item:hover {
+  background: var(--hover-bg);
+  color: var(--text);
+}
+
+.settings-nav-item.active {
+  background: var(--hover-bg);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.settings-nav-item:focus-visible {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: -2px;
+}
+
+.settings-panels {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.settings-panel {
+  display: none;
+}
+
+.settings-panel.active {
+  display: block;
+}
+
+/* A toggle field lays its label/description and the switch itself side by
+   side, unlike every other .field (which stacks label above control).
+   Needs the compound .field.field-toggle selector, not .field-toggle
+   alone — same specificity as plain .field otherwise, and .field's own
+   display:block (later in source) would win. */
+.field.field-toggle {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.field-toggle-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.toggle-switch {
+  flex-shrink: 0;
+  appearance: none;
+  width: 40px;
+  height: 24px;
+  margin: 2px 0 0;
+  border-radius: 999px;
+  background: var(--border);
+  position: relative;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.toggle-switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: var(--shadow-xs);
+  transition: transform 150ms ease;
+}
+
+.toggle-switch:checked {
+  background: var(--accent);
+}
+
+.toggle-switch:checked::before {
+  transform: translateX(16px);
+}
+
+.toggle-switch:focus-visible {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: 2px;
 }
 
 .field {
@@ -808,7 +931,7 @@ h1 {
   text-decoration: underline;
 }
 
-.field input:not([type="range"]),
+.field input:not([type="range"]):not([type="checkbox"]),
 .field select,
 .field textarea {
   width: 100%;
@@ -889,7 +1012,7 @@ h1 {
 
 /* Focus (their input.tsx isFocusWithin): the 1px neutral ring is
    entirely replaced by a 2px accent ring — not layered on top of it. */
-.field input:not([type="range"]):focus,
+.field input:not([type="range"]):not([type="checkbox"]):focus,
 .field select:focus,
 .field textarea:focus,
 .file-bar select:focus {

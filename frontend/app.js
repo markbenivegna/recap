@@ -58,6 +58,8 @@ const cfgOutputDevice = document.getElementById("cfgOutputDevice");
 const cfgSpendThreshold = document.getElementById("cfgSpendThreshold");
 const cfgDiarizationThreshold = document.getElementById("cfgDiarizationThreshold");
 const cfgDiarizationThresholdValue = document.getElementById("cfgDiarizationThresholdValue");
+const cfgShowMenuBarIcon = document.getElementById("cfgShowMenuBarIcon");
+const cfgDetectMeetings = document.getElementById("cfgDetectMeetings");
 const usageValueText = document.getElementById("usageValueText");
 const usagePill = document.getElementById("usagePill");
 const usageRingFill = document.getElementById("usageRingFill");
@@ -124,6 +126,19 @@ function switchTab(tabName) {
 
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
+
+function switchSettingsCategory(category) {
+  document.querySelectorAll(".settings-nav-item").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.category === category);
+  });
+  document.querySelectorAll(".settings-panel").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.category === category);
+  });
+}
+
+document.querySelectorAll(".settings-nav-item").forEach((btn) => {
+  btn.addEventListener("click", () => switchSettingsCategory(btn.dataset.category));
 });
 
 let activeStreams = [];
@@ -691,6 +706,7 @@ async function checkUsageAlert() {
 
 async function openSettings({ isFirstRun = false } = {}) {
   settingsIntro.hidden = !isFirstRun;
+  switchSettingsCategory(isFirstRun ? "api-keys" : "general");
   try {
     const res = await fetch("/api/settings");
     const data = await res.json();
@@ -702,12 +718,14 @@ async function openSettings({ isFirstRun = false } = {}) {
     cfgSpendThreshold.value = data.SPEND_ALERT_THRESHOLD || "";
     cfgDiarizationThreshold.value = data.DIARIZATION_THRESHOLD || "0.7";
     cfgDiarizationThresholdValue.textContent = Number(cfgDiarizationThreshold.value).toFixed(2);
+    cfgShowMenuBarIcon.checked = data.SHOW_MENU_BAR_ICON !== "false";
+    cfgDetectMeetings.checked = data.DETECT_MEETINGS !== "false";
     loadUsageDisplay();
   } catch (err) {
     showToast(`Could not load current settings: ${err.message}`, true);
   }
   settingsModal.hidden = false;
-  settingsModal.querySelector(".modal-body").scrollTop = 0;
+  settingsModal.querySelector(".settings-panels").scrollTop = 0;
 }
 
 function closeSettings() {
@@ -735,6 +753,8 @@ async function saveSettings() {
         RECORDING_OUTPUT_DEVICE: cfgOutputDevice.value.trim(),
         SPEND_ALERT_THRESHOLD: cfgSpendThreshold.value.trim(),
         DIARIZATION_THRESHOLD: cfgDiarizationThreshold.value,
+        SHOW_MENU_BAR_ICON: String(cfgShowMenuBarIcon.checked),
+        DETECT_MEETINGS: String(cfgDetectMeetings.checked),
       }),
     });
     const data = await res.json();
@@ -756,6 +776,8 @@ async function saveSettings() {
   cfgOutputDevice,
   cfgSpendThreshold,
   cfgDiarizationThreshold,
+  cfgShowMenuBarIcon,
+  cfgDetectMeetings,
 ].forEach((el) => {
   el.addEventListener("change", saveSettings);
 });

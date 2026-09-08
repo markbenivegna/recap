@@ -11,6 +11,8 @@ CONFIG_FIELDS = [
     ("DIARIZATION_THRESHOLD", False),
     ("RECORDING_OUTPUT_DEVICE", False),
     ("SPEND_ALERT_THRESHOLD", False),
+    ("SHOW_MENU_BAR_ICON", False),
+    ("DETECT_MEETINGS", False),
 ]
 
 
