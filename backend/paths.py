@@ -13,6 +13,7 @@ ENV_PATH = os.path.join(APP_SUPPORT_DIR, ".env")
 CACHE_DIR = os.path.join(APP_SUPPORT_DIR, ".cache")
 USAGE_FILE = os.path.join(APP_SUPPORT_DIR, ".usage.json")
 RECORDINGS_DIR = os.path.join(APP_SUPPORT_DIR, "recordings")
+WINDOW_STATE_FILE = os.path.join(APP_SUPPORT_DIR, "window_state.json")
 
 # Where these used to live — every existing install (every copy of Recap
 # has run from source so far) has real user data sitting here: API keys in

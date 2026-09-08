@@ -46,7 +46,7 @@ import threading  # noqa: E402
 
 import webview  # noqa: E402
 
-from backend import menubar  # noqa: E402
+from backend import menubar, window_state  # noqa: E402
 from backend.app import app  # noqa: E402
 
 HOST = "127.0.0.1"
@@ -191,9 +191,47 @@ if __name__ == "__main__":
 
     patch_media_capture_permission()
 
-    window = webview.create_window(
-        APP_NAME, f"http://{HOST}:{port}", width=850, height=600, min_size=(700, 500), background_color="#FFFFFF"
-    )
+    # Restore the last position/size, but only if it's still within some
+    # currently-connected screen's bounds — a saved position from a monitor
+    # that's since been unplugged (a laptop undocked, an external display
+    # disconnected) would otherwise put the window somewhere unreachable.
+    # Falls back to today's default (centered, 850x600) whenever there's no
+    # saved state, or it's off-screen.
+    create_kwargs = {"width": 850, "height": 600, "min_size": (700, 500), "background_color": "#FFFFFF"}
+    saved_state = window_state.load()
+    if saved_state:
+        try:
+            x, y = saved_state["x"], saved_state["y"]
+            on_screen = any(
+                s.frame.origin.x <= x < s.frame.origin.x + s.frame.size.width
+                and s.frame.origin.y <= y < s.frame.origin.y + s.frame.size.height
+                for s in webview.screens
+            )
+            if on_screen:
+                create_kwargs.update(x=x, y=y, width=saved_state["width"], height=saved_state["height"])
+        except Exception:
+            pass
+
+    window = webview.create_window(APP_NAME, f"http://{HOST}:{port}", **create_kwargs)
+
+    _save_state_timer = None
+
+    def _save_window_state():
+        try:
+            window_state.save(window.x, window.y, window.width, window.height)
+        except Exception:
+            pass
+
+    def schedule_save_window_state():
+        # events.moved/resized fire repeatedly during a drag — debounce so
+        # this only actually writes once things settle, not on every
+        # intermediate frame.
+        global _save_state_timer
+        if _save_state_timer is not None:
+            _save_state_timer.cancel()
+        _save_state_timer = threading.Timer(0.5, _save_window_state)
+        _save_state_timer.daemon = True
+        _save_state_timer.start()
 
     def on_shown():
         # events.shown fires on a background thread, but AppKit requires
@@ -221,4 +259,6 @@ if __name__ == "__main__":
 
     window.events.shown += on_shown
     window.events.closing += on_closing
+    window.events.moved += schedule_save_window_state
+    window.events.resized += schedule_save_window_state
     webview.start()
