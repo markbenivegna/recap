@@ -1,0 +1,5 @@
+# Build-time only — not needed to run Recap, only to package it into a
+# distributable Recap.app (scripts/recap.spec). Install into the same venv
+# as requirements.txt: pip install -r requirements-build.txt
+pyinstaller==6.22.2
+pyinstaller-hooks-contrib==2026.7

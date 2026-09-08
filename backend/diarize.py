@@ -2,6 +2,7 @@ import contextlib
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 
 import numpy as np
@@ -23,6 +24,17 @@ _model = None
 
 
 def _find_ffmpeg_bin():
+    # When packaged (see scripts/bundle_ffmpeg.sh), always prefer our own
+    # bundled copy over whatever's on PATH — guaranteed present and
+    # known-compatible, unlike an arbitrary system install someone may or
+    # may not have. sys.executable is Contents/MacOS/Recap in a frozen app.
+    if getattr(sys, "frozen", False):
+        bundled = os.path.normpath(
+            os.path.join(os.path.dirname(sys.executable), "..", "Resources", "ffmpeg-bin", "ffmpeg")
+        )
+        if os.path.isfile(bundled) and os.access(bundled, os.X_OK):
+            return bundled
+
     # Same issue as SwitchAudioSource in audio_switch.py: a GUI-launched app
     # (opened from Finder/the app drawer, not a Terminal) gets a minimal
     # PATH that doesn't include Homebrew's bin dir, so shutil.which() alone

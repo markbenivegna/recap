@@ -9,3 +9,5 @@ recap.log
 assets/icon.iconset/
 .cache/
 .usage.json
+dist/
+build/
