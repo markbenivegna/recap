@@ -6,7 +6,9 @@ import webview
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 
-load_dotenv()
+from backend.paths import ENV_PATH, RECORDINGS_DIR
+
+load_dotenv(ENV_PATH)
 
 from backend import audio_switch, config as app_config, markdown_export, notion_client, usage_tracker
 from backend.diarize import diarize_segments, diarize_with_source_separation, format_transcript_with_speakers
@@ -22,7 +24,6 @@ def _meeting_title(raw_title):
     return f"{meeting_title} - {formatted_date}" if meeting_title else f"Meeting Notes - {formatted_date}"
 
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
-RECORDINGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "recordings")
 ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets")
 
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")

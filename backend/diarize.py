@@ -10,6 +10,8 @@ import torch
 from sklearn.cluster import AgglomerativeClustering
 from speechbrain.inference.speaker import EncoderClassifier
 
+from backend.paths import CACHE_DIR
+
 # Cosine-distance cutoff for treating two segments as different speakers.
 # Lower = more speakers detected (more likely to split one voice into two);
 # higher = fewer speakers detected (more likely to merge two voices into one).
@@ -41,7 +43,7 @@ _FFMPEG_BIN = _find_ffmpeg_bin()
 def get_model():
     global _model
     if _model is None:
-        cache_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".cache", "spkrec-ecapa-voxceleb")
+        cache_dir = os.path.join(CACHE_DIR, "spkrec-ecapa-voxceleb")
         _model = EncoderClassifier.from_hparams(source="speechbrain/spkrec-ecapa-voxceleb", savedir=cache_dir)
     return _model
 

@@ -1,7 +1,7 @@
 import json
 import os
 
-USAGE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".usage.json")
+from backend.paths import USAGE_FILE
 
 # Anthropic's own balance/remaining-credit figure isn't exposed by any API
 # for a standard key — this tracks what Recap itself has spent, computed

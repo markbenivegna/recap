@@ -1,6 +1,6 @@
 import os
 
-ENV_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+from backend.paths import ENV_PATH
 
 # (env var name, whether it's a secret that should be masked in the UI)
 CONFIG_FIELDS = [
