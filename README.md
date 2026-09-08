@@ -35,7 +35,7 @@ The easiest way to get Recap: no Python, no Homebrew, no terminal.
 2. Right-click (or Control-click) it in Finder and choose **Open** once. Recap isn't notarized (that costs an Apple Developer account, and this is a free tool with no interest in that relationship with Apple), so macOS shows the normal "unidentified developer" warning any downloaded, non-App-Store app gets. That's the standard one-time step every Mac user has always dealt with, not a sign anything's wrong.
 3. Open it. See [Configure API keys](#configure-api-keys) below for what happens next.
 
-Prefer to build it yourself, or want to contribute? See [Build from source](#build-from-source).
+Prefer to build it yourself instead? See [Build from source](#build-from-source). Have an idea or found a bug? See [Feedback](#feedback) below rather than sending a pull request; see [License](#license) for why.
 
 ## Configure API keys
 
@@ -57,7 +57,7 @@ Prefer editing a file directly instead? Recap keeps its own data (API keys, the 
 
 ## Build from source
 
-For development or contributing. If you just want to use Recap, [Download](#download) above is much less work.
+For running your own copy from source. If you just want to use Recap, [Download](#download) above is much less work.
 
 ### 0. Prerequisites
 
@@ -256,6 +256,14 @@ voice-embedding clustering alone across the whole recording, same as before.
 split into different speakers vs. merged together; see `.env.example` for
 details. The embedding model downloads once (to
 `~/Library/Application Support/Recap/.cache/`) on first use.
+
+## License
+
+Recap is source-available, not open source. You're free to download it,
+build it yourself, and use it, but the [LICENSE](LICENSE) (PolyForm Strict
+1.0.0) doesn't permit redistributing it or modifying it, so please don't
+fork it or ship a modified version. If there's something you'd like
+changed, see [Feedback](#feedback) below instead.
 
 ## Feedback
 
