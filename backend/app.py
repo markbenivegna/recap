@@ -123,9 +123,10 @@ def api_settings_post():
         # since PyObjCTools isn't meaningfully usable there anyway.
         from PyObjCTools import AppHelper
 
-        from backend import menubar
+        from backend import meeting_detector, menubar
 
         AppHelper.callAfter(menubar.sync)
+        AppHelper.callAfter(meeting_detector.sync)
     except Exception:
         pass
     return jsonify({"ok": True})

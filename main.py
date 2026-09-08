@@ -46,7 +46,7 @@ import threading  # noqa: E402
 
 import webview  # noqa: E402
 
-from backend import menubar, window_state  # noqa: E402
+from backend import meeting_detector, menubar, window_state  # noqa: E402
 from backend.app import app  # noqa: E402
 
 HOST = "127.0.0.1"
@@ -242,6 +242,7 @@ if __name__ == "__main__":
         AppHelper.callAfter(hide_titlebar_text, window)
         AppHelper.callAfter(watch_appearance_changes, window)
         AppHelper.callAfter(menubar.sync, window)
+        AppHelper.callAfter(meeting_detector.sync, window)
 
     def on_closing():
         # Only hide-instead-of-quit when the menu bar icon is actually
