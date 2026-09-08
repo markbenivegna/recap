@@ -158,6 +158,7 @@ This never auto-starts a recording on its own; it only asks. And Recap's own rec
 - Only pages/databases explicitly shared with your Notion integration show up in the dropdown.
 - Recap remembers its window position and size across launches (falling back to centered if that spot isn't on a currently-connected screen anymore, e.g. after unplugging a monitor).
 - `WHISPER_MODEL_SIZE` in `.env` controls the local model (`small` by default; try `medium` for better accuracy or `base` for more speed).
+- Recap isn't English-only. Whisper auto-detects whatever language is actually spoken, no setting required. The default `small` model is noticeably better at English than at lower-resource languages, so if you're regularly transcribing something else, bumping `WHISPER_MODEL_SIZE` up to `medium` helps.
 
 ## Why not just use [thing that already exists]
 
