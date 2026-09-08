@@ -122,6 +122,53 @@ def patch_app_reopen():
         pass
 
 
+def patch_window_close_crash():
+    # pywebview's own WindowDelegate.windowWillClose_ (cocoa.py) ends with
+    # `BrowserView.app.stop_(self); BrowserView.app.abortModal_()` once the
+    # very last window instance closes (a real quit, not our hide-instead-
+    # of-close override in on_closing below). That second call is a genuine
+    # pywebview bug on this PyObjC/AppKit version: NSApplication's
+    # zero-argument abortModal selector binds to plain `abortModal` (no
+    # trailing underscore) here, not `abortModal_` — confirmed directly
+    # (`hasattr(NSApplication.sharedApplication(), "abortModal")` is True,
+    # `"abortModal_"` is False). Hitting it crashes the whole app on the
+    # final close (e.g. via the menu bar's Quit item, or Cmd+Q), which is
+    # what produced the `AttributeError: 'NSApplication' object has no
+    # attribute 'abortModal_'` crash-and-relaunch seen in recap.log.
+    # PyObjC-bridged NSObject instances don't support arbitrary instance
+    # attributes (confirmed: no __dict__), so aliasing the fix onto
+    # BrowserView.app itself isn't possible — patching the class method is
+    # the only way. Same subclass-before-create_window timing as the other
+    # patches above (this one replaces the method outright rather than
+    # subclassing, since WindowDelegate is instantiated internally by
+    # pywebview with no hook to swap in a subclass).
+    try:
+        from webview.platforms.cocoa import BrowserView
+        from webview.platforms.cocoa import windows as _pywebview_windows
+
+        def _fixed_window_will_close(self, notification):
+            i = BrowserView.get_instance('window', notification.object())
+            del BrowserView.instances[i.uid]
+
+            if i.pywebview_window in _pywebview_windows:
+                _pywebview_windows.remove(i.pywebview_window)
+
+            i.webview.setNavigationDelegate_(None)
+            i.webview.setUIDelegate_(None)
+            i.webview.loadHTMLString_baseURL_('', None)
+            i.webview.removeFromSuperview()
+            i.webview = None
+
+            i.closed.set()
+            if BrowserView.instances == {}:
+                BrowserView.app.stop_(self)
+                BrowserView.app.abortModal()  # the actual fix: no trailing underscore
+
+        BrowserView.WindowDelegate.windowWillClose_ = _fixed_window_will_close
+    except Exception:
+        pass
+
+
 # Defined once here at module level (guarded, but not inside a function),
 # not inside patch_about_panel() below — PyObjC registers a real
 # Objective-C class the moment a class body like this actually runs, and
@@ -136,14 +183,25 @@ try:
     class _AboutPanelTargetClass(NSObject):
         def showAbout_(self, sender):
             try:
-                from AppKit import NSAboutPanelOptionCredits, NSApplication
-                from Foundation import NSLinkAttributeName, NSMutableAttributedString, NSURL
+                # NSLinkAttributeName lives in AppKit on this PyObjC version,
+                # not Foundation (confirmed directly: AppKit.NSLinkAttributeName
+                # exists, Foundation.NSLinkAttributeName raises ImportError) —
+                # importing it from Foundation silently failed here, caught by
+                # this same try/except, so the panel never opened at all. This
+                # was the actual cause of the About panel not opening.
+                from AppKit import NSAboutPanelOptionCredits, NSApplication, NSLinkAttributeName
+                from Foundation import NSMutableAttributedString, NSURL
 
-                credits = NSMutableAttributedString.alloc().initWithString_("Support the developer on Venmo")
-                credits.addAttribute_value_range_(
-                    NSLinkAttributeName,
-                    NSURL.URLWithString_("https://venmo.com/u/Mark-Benivegna"),
-                    (0, credits.length()),
+                def _linked_line(text, url):
+                    line = NSMutableAttributedString.alloc().initWithString_(text)
+                    line.addAttribute_value_range_(NSLinkAttributeName, NSURL.URLWithString_(url), (0, line.length()))
+                    return line
+
+                credits = NSMutableAttributedString.alloc().initWithString_("Built by ")
+                credits.appendAttributedString_(_linked_line("Mark Benivegna", "https://mark.benivegna.com/"))
+                credits.appendAttributedString_(NSMutableAttributedString.alloc().initWithString_("\n"))
+                credits.appendAttributedString_(
+                    _linked_line("Support the developer on Venmo", "https://venmo.com/u/Mark-Benivegna")
                 )
                 NSApplication.sharedApplication().orderFrontStandardAboutPanelWithOptions_(
                     {NSAboutPanelOptionCredits: credits}
@@ -287,6 +345,7 @@ if __name__ == "__main__":
 
     patch_media_capture_permission()
     patch_app_reopen()
+    patch_window_close_crash()
 
     # Restore the last position/size, but only if it's still within some
     # currently-connected screen's bounds — a saved position from a monitor
