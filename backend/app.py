@@ -98,6 +98,30 @@ def api_summarize():
 
     try:
         result = summarize_transcript(transcript)
+        try:
+            # Dispatched onto the main thread (same reason as every other
+            # native call from this Flask thread — see /api/settings below)
+            # since is_window_focused() itself makes a real NSWindow call.
+            from PyObjCTools import AppHelper
+
+            from backend import menubar, notifications
+
+            # Idempotent (a plain dict write) — cheap enough to just redo on
+            # every call rather than tracking whether it's already been
+            # registered once.
+            notifications.register_action("transcription_ready", menubar.show_window)
+
+            def _notify_if_not_focused():
+                if not menubar.is_window_focused():
+                    notifications.deliver(
+                        "transcription_ready",
+                        "Recap is ready",
+                        "Your transcript and summary are ready to review.",
+                    )
+
+            AppHelper.callAfter(_notify_if_not_focused)
+        except Exception:
+            pass
         return jsonify(result)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500

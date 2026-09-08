@@ -62,6 +62,21 @@ def _make_target():
     return _MenuBarTarget.alloc().init()
 
 
+def is_window_focused():
+    """Whether Recap's window is currently the frontmost, focused window —
+    used to decide whether a background completion (e.g. a finished
+    transcription) is worth a notification, or the user's already looking
+    right at it. False whenever it's hidden (our own tracked state — see
+    the note above on window.hidden not being trustworthy) or some other
+    window/app is currently focused instead."""
+    if _window_hidden or _window is None:
+        return False
+    try:
+        return bool(_window.native.isKeyWindow())
+    except Exception:
+        return False
+
+
 def hide_window():
     global _window_hidden
     if _window is None:

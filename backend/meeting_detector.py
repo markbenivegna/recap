@@ -3,8 +3,9 @@ import threading
 
 import objc
 import CoreAudio as CA
-from Foundation import NSBundle, NSObject, NSUserNotification, NSUserNotificationCenter
+from Foundation import NSBundle
 
+from backend import notifications
 from backend.config import read_config
 
 # 2s latency before noticing a meeting started is imperceptible for this —
@@ -90,51 +91,35 @@ def _click_record_button():
         pass
 
 
-class _NotificationDelegate(NSObject):
-    def userNotificationCenter_didActivateNotification_(self, center, notification):
-        try:
-            if _window is not None:
-                # NSUserNotificationCenterDelegate callbacks fire on the
-                # main thread — confirmed the hard way, this caused a real
-                # deadlock. window.evaluate_js() internally does its own
-                # AppHelper.callAfter(...) to hop onto the main thread, then
-                # blocks the *calling* thread on a semaphore waiting for
-                # that scheduled call to run and release it. Called
-                # directly from here (already on the main thread), the
-                # semaphore-wait blocks the only thread that could ever run
-                # the callAfter-scheduled call that would release it —
-                # exactly the "spinning wheel, force quit" the user hit.
-                # window.hide()/show() don't have this problem (fire-and-
-                # forget callAfter, no wait) — only evaluate_js does, since
-                # it's the only one built to return a value. Dispatching to
-                # a plain background thread first sidesteps it entirely:
-                # evaluate_js's blocking wait is safe from any thread that
-                # isn't the one the callAfter callback itself needs to run
-                # on.
-                threading.Thread(target=_click_record_button, daemon=True).start()
-        except Exception:
-            pass
-        try:
-            center.removeDeliveredNotification_(notification)
-        except Exception:
-            pass
+def _on_start_recording_clicked():
+    # NSUserNotificationCenterDelegate callbacks fire on the main thread —
+    # confirmed the hard way, this caused a real deadlock.
+    # window.evaluate_js() internally does its own AppHelper.callAfter(...)
+    # to hop onto the main thread, then blocks the *calling* thread on a
+    # semaphore waiting for that scheduled call to run and release it.
+    # Called directly from here (already on the main thread), the
+    # semaphore-wait blocks the only thread that could ever run the
+    # callAfter-scheduled call that would release it — exactly the
+    # "spinning wheel, force quit" that happened. window.hide()/show()
+    # don't have this problem (fire-and-forget callAfter, no wait) — only
+    # evaluate_js does, since it's the only one built to return a value.
+    # Dispatching to a plain background thread first sidesteps it entirely:
+    # evaluate_js's blocking wait is safe from any thread that isn't the
+    # one the callAfter callback itself needs to run on.
+    if _window is not None:
+        threading.Thread(target=_click_record_button, daemon=True).start()
 
 
-_delegate = _NotificationDelegate.alloc().init()
+notifications.register_action("meeting_detected", _on_start_recording_clicked)
 
 
 def _notify_meeting_detected():
-    try:
-        center = NSUserNotificationCenter.defaultUserNotificationCenter()
-        center.setDelegate_(_delegate)
-        note = NSUserNotification.alloc().init()
-        note.setTitle_("Meeting detected")
-        note.setInformativeText_("Another app just started using your microphone. Start recording in Recap?")
-        note.setHasActionButton_(True)
-        note.setActionButtonTitle_("Start Recording")
-        center.deliverNotification_(note)
-    except Exception:
-        pass
+    notifications.deliver(
+        "meeting_detected",
+        "Meeting detected",
+        "Another app just started using your microphone. Start recording in Recap?",
+        action_title="Start Recording",
+    )
 
 
 def _check_once():
