@@ -18,16 +18,42 @@ you'd rather skip Notion entirely.
 (Screenshots use placeholder content, not real meeting data — I'm not
 putting an actual meeting of mine in a public README.)
 
-## Setup
+## Download
 
-None of this is bad, but there are a few steps — it's a real app you build
-once, not a `pip install`. Should take maybe ten minutes.
+The easiest way to get Recap: no Python, no Homebrew, no terminal.
+
+1. Grab `Recap.app.zip` from the [latest release](https://github.com/markbenivegna/recap/releases/latest), unzip it, and drag `Recap.app` into `~/Applications` (or wherever you keep apps).
+2. Right-click (or Control-click) it in Finder and choose **Open** once. Recap isn't notarized — that costs an Apple Developer account, and this is a free tool with no interest in that relationship with Apple — so macOS shows the normal "unidentified developer" warning any downloaded, non-App-Store app gets. That's the standard one-time step every Mac user has always dealt with, not a sign anything's wrong.
+3. Open it. See [Configure API keys](#configure-api-keys) below for what happens next.
+
+Prefer to build it yourself, or want to contribute? See [Build from source](#build-from-source).
+
+## Configure API keys
+
+However you got Recap, you'll need two keys:
+
+- **`ANTHROPIC_API_KEY`** — go to [console.anthropic.com](https://console.anthropic.com), sign in (this is a separate pay-as-you-go account from a claude.ai subscription), open **API Keys** in the left sidebar, click **Create Key**, and copy it. A typical meeting (transcription + summarization) costs a few cents.
+- **`NOTION_API_KEY`** — go to [notion.so/my-integrations](https://www.notion.so/my-integrations), click **New integration**, give it any name (e.g. "Recap"), and create it. Copy the **Internal Integration Secret** it shows you.
+  - **Then, separately**, in Notion itself: open every page or database you want to be able to file meeting notes into, click the **`...`** menu in the top right, go to **Connections**, and connect your new integration. Repeat for each page — pages not explicitly connected this way will never show up in the app's dropdown, even though the API key itself is valid.
+
+The first time Recap opens with no key set, it automatically opens **Settings** (the ⚙ icon) for you to paste both keys in — no text editor, no `.env` required. You can also open Settings any time later to change them, the Whisper model size, vocabulary hints, or the system-audio output device.
+
+Prefer editing a file directly instead? Recap keeps its own data — API keys, the downloaded diarization model, usage tracking — in `~/Library/Application Support/Recap/` (the standard macOS location for this, independent of wherever the app itself lives). Copy `.env.example` from this repo to `~/Library/Application Support/Recap/.env` and fill it in the same way — see the comments in `.env.example` for every available option, including `DIARIZATION_THRESHOLD` (not exposed in the Settings UI since it rarely needs changing).
+
+### First launch
+
+- Clicking **Record** for the first time triggers a normal macOS microphone-permission prompt — click **Allow**.
+- The very first recording you transcribe will trigger a one-time download of the `faster-whisper` model (a few hundred MB for the default `small` size) and the speaker-diarization model (`speechbrain/spkrec-ecapa-voxceleb`, downloaded to `~/Library/Application Support/Recap/.cache/`) — expect that first transcription to take noticeably longer than later ones while those download. Everything after that runs fully offline.
+
+## Build from source
+
+For development or contributing — if you just want to use Recap, [Download](#download) above is much less work.
 
 ### 0. Prerequisites
 
-- **macOS**, Apple Silicon (arm64) — the build script embeds an arm64-only Python runtime inside the app.
+- **macOS**, Apple Silicon (arm64) — the build embeds an arm64-only Python runtime inside the app.
 - **Python 3.9+** — macOS ships one at `/usr/bin/python3`, or install one via [Homebrew](https://brew.sh) (`brew install python3`).
-- **[Homebrew](https://brew.sh)**, for the one required system dependency below.
+- **[Homebrew](https://brew.sh)**, for the required system dependencies below.
 - **ffmpeg**, used to decode recorded audio before diarization:
   ```bash
   brew install ffmpeg
@@ -48,15 +74,7 @@ pip install -r requirements.txt
 
 ### 2. Configure API keys
 
-You don't need to touch `.env` by hand — build the app first (next step), open it, and it'll walk you through this. But you do still need the two keys themselves:
-
-- **`ANTHROPIC_API_KEY`** — go to [console.anthropic.com](https://console.anthropic.com), sign in (this is a separate pay-as-you-go account from a claude.ai subscription), open **API Keys** in the left sidebar, click **Create Key**, and copy it. A typical meeting (transcription + summarization) costs a few cents.
-- **`NOTION_API_KEY`** — go to [notion.so/my-integrations](https://www.notion.so/my-integrations), click **New integration**, give it any name (e.g. "Recap"), and create it. Copy the **Internal Integration Secret** it shows you.
-  - **Then, separately**, in Notion itself: open every page or database you want to be able to file meeting notes into, click the **`...`** menu in the top right, go to **Connections**, and connect your new integration. Repeat for each page — pages not explicitly connected this way will never show up in the app's dropdown, even though the API key itself is valid.
-
-The first time Recap opens with no key set, it automatically opens **Settings** (the ⚙ icon) for you to paste both keys in — no text editor, no `.env` required. You can also open Settings any time later to change them, the Whisper model size, vocabulary hints, or the system-audio output device.
-
-Prefer editing `.env` directly instead? `cp .env.example .env` and fill it in the same way — see the comments in `.env.example` for every available option, including `DIARIZATION_THRESHOLD` (not exposed in the Settings UI since it rarely needs changing).
+See [Configure API keys](#configure-api-keys) above — same either way.
 
 ### 3. Build the app
 
@@ -64,14 +82,27 @@ Prefer editing `.env` directly instead? `cp .env.example .env` and fill it in th
 ./scripts/build_app.sh
 ```
 
-This creates **Recap.app** in `~/Applications` with a custom icon — a one-time step that takes a minute or two. Open it from Finder or Launchpad from here on; no terminal needed after this point.
+This creates **Recap.app** in `~/Applications` with a custom icon — a one-time step that takes a minute or two, and a thin launcher that runs against this checkout's own venv (fast to rebuild, but only works on this machine). Open it from Finder or Launchpad from here on; no terminal needed after this point.
 
 ### 4. First launch
 
-- macOS will likely show an **"unidentified developer"** Gatekeeper warning, since the app isn't code-signed. Right-click (or Control-click) the app in Finder and choose **Open** once — you'll only need to do this the first time.
-- With no `ANTHROPIC_API_KEY` set yet, Recap opens straight to **Settings** — paste in your Anthropic and Notion keys from step 2 and hit **Save**.
-- Clicking **Record** for the first time triggers a normal macOS microphone-permission prompt — click **Allow**.
-- The very first recording you transcribe will trigger a one-time download of the `faster-whisper` model (a few hundred MB for the default `small` size) and the speaker-diarization model (`speechbrain/spkrec-ecapa-voxceleb`, downloaded to `.cache/`) — expect that first transcription to take noticeably longer than later ones while those download. Everything after that runs fully offline.
+Same as [First launch](#first-launch) above, plus the Gatekeeper step from [Download](#download) — `build_app.sh`'s output isn't code-signed either.
+
+### Cutting a real release (maintainers)
+
+`build_app.sh` above is a dev convenience — its output only runs on the machine it was built on (it points at that checkout's own venv, not a bundled copy of everything). A real, standalone, downloadable `Recap.app` — the one [Download](#download) points at — is built differently, via `scripts/recap.spec` (PyInstaller), and published automatically by [`.github/workflows/release.yml`](.github/workflows/release.yml) whenever a version tag is pushed:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+That's the whole release process — GitHub Actions builds it on a real macOS runner and publishes the result. To test that build locally instead (needs `pyinstaller` and `dylibbundler`: `pip install -r requirements-build.txt` and `brew install dylibbundler`):
+
+```bash
+pyinstaller scripts/recap.spec --noconfirm --distpath dist --workpath build
+scripts/bundle_ffmpeg.sh dist/Recap.app
+```
 
 ## Run
 
@@ -192,4 +223,5 @@ voice-embedding clustering alone across the whole recording, same as before.
 
 `DIARIZATION_THRESHOLD` in `.env` controls how aggressively segments are
 split into different speakers vs. merged together — see `.env.example` for
-details. The embedding model downloads once (to `.cache/`) on first use.
+details. The embedding model downloads once (to
+`~/Library/Application Support/Recap/.cache/`) on first use.
