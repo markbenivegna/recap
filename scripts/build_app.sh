@@ -92,6 +92,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 	<string>Recap needs microphone access to record your meetings.</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>11.0</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 Mark Benivegna. All rights reserved.</string>
 </dict>
 </plist>
 PLIST

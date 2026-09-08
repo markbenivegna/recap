@@ -118,5 +118,6 @@ app = BUNDLE(
         "NSHighResolutionCapable": True,
         "NSMicrophoneUsageDescription": "Recap needs microphone access to record your meetings.",
         "LSMinimumSystemVersion": "11.0",
+        "NSHumanReadableCopyright": "Copyright © 2026 Mark Benivegna. All rights reserved.",
     },
 )

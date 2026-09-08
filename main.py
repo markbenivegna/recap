@@ -122,6 +122,74 @@ def patch_app_reopen():
         pass
 
 
+# Defined once here at module level (guarded, but not inside a function),
+# not inside patch_about_panel() below — PyObjC registers a real
+# Objective-C class the moment a class body like this actually runs, and
+# redefining it on a later call raises "is overriding existing Objective-C
+# class" (hit and fixed for the exact same reason in backend/menubar.py's
+# menu bar click target). patch_about_panel() only ever instantiates this
+# already-defined class, never redefines it.
+_AboutPanelTarget = None
+try:
+    from Foundation import NSObject
+
+    class _AboutPanelTargetClass(NSObject):
+        def showAbout_(self, sender):
+            try:
+                from AppKit import NSAboutPanelOptionCredits, NSApplication
+                from Foundation import NSLinkAttributeName, NSMutableAttributedString, NSURL
+
+                credits = NSMutableAttributedString.alloc().initWithString_("Support the developer on Venmo")
+                credits.addAttribute_value_range_(
+                    NSLinkAttributeName,
+                    NSURL.URLWithString_("https://venmo.com/u/Mark-Benivegna"),
+                    (0, credits.length()),
+                )
+                NSApplication.sharedApplication().orderFrontStandardAboutPanelWithOptions_(
+                    {NSAboutPanelOptionCredits: credits}
+                )
+            except Exception:
+                pass
+
+    _AboutPanelTarget = _AboutPanelTargetClass
+except Exception:
+    pass
+
+_about_panel_target = None
+
+
+def patch_about_panel():
+    # pywebview wires "About Recap" straight to AppKit's plain
+    # orderFrontStandardAboutPanel: (see cocoa.py's create_menu — a bare
+    # selector string, not a custom action), which only shows what's
+    # already in Info.plist (name, version, NSHumanReadableCopyright) with
+    # no way to add anything else. orderFrontStandardAboutPanelWithOptions_
+    # is the same standard panel, just with an optional Credits field
+    # (a real NSAttributedString, so it can hold an actual clickable link)
+    # layered on top of those same Info.plist-derived defaults. Retargeting
+    # the existing menu item to a small target object that calls the
+    # WithOptions variant instead gets that without touching anything else
+    # about the menu pywebview already built. Must run after that menu
+    # actually exists — unlike patch_media_capture_permission/
+    # patch_app_reopen above, this can't happen before create_window()/
+    # start(); it's called from on_shown instead.
+    global _about_panel_target
+    if _AboutPanelTarget is None:
+        return
+    try:
+        from webview.platforms.cocoa import BrowserView
+
+        main_menu = BrowserView.app.mainMenu()
+        if not main_menu:
+            return
+        about_item = main_menu.itemAtIndex_(0).submenu().itemAtIndex_(0)
+        _about_panel_target = _AboutPanelTarget.alloc().init()
+        about_item.setTarget_(_about_panel_target)
+        about_item.setAction_("showAbout:")
+    except Exception:
+        pass
+
+
 def find_port():
     # Prefer a fixed port so the app's origin (http://127.0.0.1:<port>) stays
     # the same across launches — WKWebView caches microphone permission per
@@ -272,6 +340,7 @@ if __name__ == "__main__":
         AppHelper.callAfter(watch_appearance_changes, window)
         AppHelper.callAfter(menubar.sync, window)
         AppHelper.callAfter(meeting_detector.sync, window)
+        AppHelper.callAfter(patch_about_panel)
 
     def on_closing():
         # Only hide-instead-of-quit when the menu bar icon is actually
