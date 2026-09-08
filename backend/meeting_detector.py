@@ -76,19 +76,42 @@ def _is_running_input(pid):
     return bool(struct.unpack("I", raw)[0]) if raw else False
 
 
+def _click_record_button():
+    try:
+        # Reuse the exact same click path a real user's Record click takes
+        # (respects the current recording state, so this can't accidentally
+        # stop an already-running recording) rather than duplicating
+        # startRecording()'s own guard logic here.
+        _window.evaluate_js(
+            "if (typeof recording !== 'undefined' && !recording) "
+            "{ document.getElementById('recordBtn').click(); }"
+        )
+    except Exception:
+        pass
+
+
 class _NotificationDelegate(NSObject):
     def userNotificationCenter_didActivateNotification_(self, center, notification):
         try:
             if _window is not None:
-                # Reuse the exact same click path a real user's Record
-                # click takes (respects the current recording state, so
-                # this can't accidentally stop an already-running
-                # recording) rather than duplicating startRecording()'s
-                # own guard logic here.
-                _window.evaluate_js(
-                    "if (typeof recording !== 'undefined' && !recording) "
-                    "{ document.getElementById('recordBtn').click(); }"
-                )
+                # NSUserNotificationCenterDelegate callbacks fire on the
+                # main thread — confirmed the hard way, this caused a real
+                # deadlock. window.evaluate_js() internally does its own
+                # AppHelper.callAfter(...) to hop onto the main thread, then
+                # blocks the *calling* thread on a semaphore waiting for
+                # that scheduled call to run and release it. Called
+                # directly from here (already on the main thread), the
+                # semaphore-wait blocks the only thread that could ever run
+                # the callAfter-scheduled call that would release it —
+                # exactly the "spinning wheel, force quit" the user hit.
+                # window.hide()/show() don't have this problem (fire-and-
+                # forget callAfter, no wait) — only evaluate_js does, since
+                # it's the only one built to return a value. Dispatching to
+                # a plain background thread first sidesteps it entirely:
+                # evaluate_js's blocking wait is safe from any thread that
+                # isn't the one the callAfter callback itself needs to run
+                # on.
+                threading.Thread(target=_click_record_button, daemon=True).start()
         except Exception:
             pass
         try:
