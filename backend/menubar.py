@@ -1,5 +1,7 @@
 import os
 
+from Foundation import NSObject
+
 from backend.config import read_config
 
 # Just the mic glyph — assets/mic-icon-source.svg is already a plain single-
@@ -42,14 +44,22 @@ def _load_template_icon():
     return image
 
 
+# Defined once at module level, not inside _make_target() — PyObjC
+# registers a real Objective-C class the first time a class body like this
+# runs, and Objective-C class names must be globally unique per process.
+# Redefining it on every _create() call (toggling the setting off then
+# back on) raised "MenuBarTarget is overriding existing Objective-C class"
+# on the second attempt — silently swallowed by _create()'s own
+# try/except, so the icon just never came back. Confirmed directly: a
+# second call to a function containing this same class body reliably
+# raises that exact error.
+class _MenuBarTarget(NSObject):
+    def toggleWindow_(self, sender):
+        toggle_window()
+
+
 def _make_target():
-    from Foundation import NSObject
-
-    class MenuBarTarget(NSObject):
-        def toggleWindow_(self, sender):
-            toggle_window()
-
-    return MenuBarTarget.alloc().init()
+    return _MenuBarTarget.alloc().init()
 
 
 def hide_window():
