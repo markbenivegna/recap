@@ -375,6 +375,13 @@ async function startRecording() {
     if (systemRecorder) systemRecorder.start();
     recording = true;
     emptyEl.hidden = true;
+    // Belt-and-suspenders reset: a prior recording that errored out (e.g.
+    // nothing to transcribe) should already leave #results hidden, but
+    // starting fresh here regardless means any stale results/failed-banner
+    // state left over from an earlier failure can never bleed into a new
+    // recording, no matter how it got left that way.
+    resultsEl.hidden = true;
+    newRecordingBtn.hidden = true;
     playRecordingAnimation(usingSystemAudio ? "Capturing your mic and system audio." : "Capturing your mic.");
     recordingStart = Date.now();
     recordBtn.textContent = "Stop";
@@ -471,8 +478,17 @@ async function handleAudioBlob(blob, filename, micBlob, systemBlob) {
     setStatus("Transcript ready. Generating summary...", false, true);
     await generateSummary(data.text);
   } catch (err) {
+    // Transcription itself failed (e.g. nothing usable was recorded) — there's
+    // no transcript to show, so go back to the blank state rather than
+    // leaving #results on screen empty. Otherwise it (and newRecordingBtn's
+    // hidden state) stays stuck like this until something else happens to
+    // reset it, and starting a new recording would show the new animation
+    // stacked on top of this stale, empty results screen.
     setStatus(`Error: ${err.message}`, true);
     showIdleControls(true);
+    resultsEl.hidden = true;
+    emptyEl.hidden = false;
+    newRecordingBtn.hidden = true;
   }
 }
 
