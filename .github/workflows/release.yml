@@ -1,0 +1,53 @@
+name: Release
+
+# Push a version tag (e.g. `git tag v1.0.0 && git push origin v1.0.0`) to
+# build a real, standalone Recap.app and publish it as a GitHub Release —
+# this is the actual release process; scripts/recap.spec is never meant to
+# be built by hand for a real release, only for local testing.
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    # GitHub-hosted macOS runners are Apple Silicon (arm64) and come with
+    # Homebrew preinstalled — both scripts/recap.spec (target_arch="arm64")
+    # and scripts/bundle_ffmpeg.sh (needs `brew`) depend on that.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install Homebrew build/runtime deps
+        run: brew install ffmpeg dylibbundler
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m venv venv
+          venv/bin/pip install --upgrade pip
+          venv/bin/pip install -r requirements.txt
+          venv/bin/pip install -r requirements-build.txt
+
+      - name: Build Recap.app
+        run: venv/bin/pyinstaller scripts/recap.spec --noconfirm --distpath dist --workpath build
+
+      - name: Bundle ffmpeg into Recap.app
+        run: scripts/bundle_ffmpeg.sh dist/Recap.app
+
+      - name: Zip Recap.app
+        # ditto (not plain zip) preserves the bundle's resource forks/xattrs
+        # and codesign metadata correctly — the standard way to zip a real
+        # macOS .app for distribution.
+        run: ditto -c -k --sequesterRsrc --keepParent dist/Recap.app Recap.app.zip
+
+      - name: Publish release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" Recap.app.zip \
+            --title "Recap ${{ github.ref_name }}" \
+            --notes "Download, unzip, and right-click → Open the first time (Recap isn't notarized — that's a normal one-time macOS Gatekeeper step for an app downloaded outside the App Store, not a warning sign). See the README for what first launch looks like."
