@@ -114,6 +114,20 @@ def api_settings_post():
     app_config.write_config(data)
     global RECORDING_OUTPUT_DEVICE
     RECORDING_OUTPUT_DEVICE = os.environ.get("RECORDING_OUTPUT_DEVICE", "")
+    try:
+        # This request handler runs on Flask's own thread, but creating or
+        # removing the real NSStatusItem is an AppKit call that (like every
+        # other native UI change in this app — see main.py's on_shown) must
+        # happen on the main thread. No-ops harmlessly outside the real
+        # packaged app (e.g. this route hit directly via the dev server),
+        # since PyObjCTools isn't meaningfully usable there anyway.
+        from PyObjCTools import AppHelper
+
+        from backend import menubar
+
+        AppHelper.callAfter(menubar.sync)
+    except Exception:
+        pass
     return jsonify({"ok": True})
 
 

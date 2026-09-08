@@ -46,6 +46,7 @@ import threading  # noqa: E402
 
 import webview  # noqa: E402
 
+from backend import menubar  # noqa: E402
 from backend.app import app  # noqa: E402
 
 HOST = "127.0.0.1"
@@ -202,6 +203,22 @@ if __name__ == "__main__":
 
         AppHelper.callAfter(hide_titlebar_text, window)
         AppHelper.callAfter(watch_appearance_changes, window)
+        AppHelper.callAfter(menubar.sync, window)
+
+    def on_closing():
+        # Only hide-instead-of-quit when the menu bar icon is actually
+        # showing — otherwise there'd be no way to get the window back, and
+        # closing should behave exactly like it always has. Unlike
+        # events.shown above, this fires synchronously from an AppKit
+        # delegate callback already on the main thread (confirmed via
+        # pywebview's own cocoa.py: windowShouldClose_ -> should_close(),
+        # both plain calls, no thread hop) — no callAfter needed here.
+        # Returning False vetoes the close (see pywebview's Event.set():
+        # any handler returning False makes should_close() return NO).
+        if menubar.is_enabled():
+            menubar.hide_window()
+            return False
 
     window.events.shown += on_shown
+    window.events.closing += on_closing
     webview.start()
