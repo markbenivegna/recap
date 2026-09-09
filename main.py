@@ -248,6 +248,44 @@ def patch_about_panel():
         pass
 
 
+def patch_window_menu():
+    # pywebview's cocoa backend only ever builds an App menu (Hide/Quit/etc)
+    # and a View menu (Full Screen) — see cocoa.py's create_menu(), which
+    # calls just _add_app_menu()/_add_view_menu(). There's no Window menu,
+    # so there's no Cmd+M: AppKit only wires that keyEquivalent up when a
+    # menu item actually claims it, it isn't a system-level binding. The
+    # window itself already knows how to miniaturize (standardWindowButton
+    # NSWindowMiniaturizeButton, and the minimize() JS API both call
+    # window.miniaturize_ under the hood) — it's just unreachable from the
+    # keyboard. Adding a real "Window > Minimize" item bound to AppKit's
+    # standard performMiniaturize: selector (target nil, so it walks the
+    # responder chain to whatever window is key) fixes that the same way
+    # every other Mac app gets Cmd+M, without touching pywebview itself.
+    # Must run after create_window()/start(), like patch_about_panel above,
+    # since the menu doesn't exist yet before that.
+    try:
+        from webview.platforms.cocoa import BrowserView
+        import AppKit
+
+        main_menu = BrowserView.app.mainMenu()
+        if not main_menu:
+            return
+        # Index 0 is the App menu, index 1 is View (see _add_view_menu's
+        # insertItem_atIndex_(..., 1)) — Window goes right after it, which
+        # matches the standard macOS menu-bar ordering (App, ..., Window).
+        window_menu = AppKit.NSMenu.alloc().init()
+        window_menu.setTitle_("Window")
+        window_menu_item = AppKit.NSMenuItem.alloc().init()
+        window_menu_item.setSubmenu_(window_menu)
+        main_menu.insertItem_atIndex_(window_menu_item, 2)
+
+        window_menu.addItemWithTitle_action_keyEquivalent_(
+            "Minimize", "performMiniaturize:", "m"
+        )
+    except Exception:
+        pass
+
+
 def find_port():
     # Prefer a fixed port so the app's origin (http://127.0.0.1:<port>) stays
     # the same across launches — WKWebView caches microphone permission per
@@ -400,6 +438,7 @@ if __name__ == "__main__":
         AppHelper.callAfter(menubar.sync, window)
         AppHelper.callAfter(meeting_detector.sync, window)
         AppHelper.callAfter(patch_about_panel)
+        AppHelper.callAfter(patch_window_menu)
 
     def on_closing():
         # Only hide-instead-of-quit when the menu bar icon is actually
