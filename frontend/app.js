@@ -491,9 +491,16 @@ async function handleAudioBlob(blob, filename, micBlob, systemBlob) {
   newRecordingBtn.hidden = true;
   showIdleControls(false);
   setStatus("Transcribing locally (this can take a minute)...", false, true);
-  renderSkeleton(summaryContent);
-  renderSkeleton(notesContent);
-  renderSkeleton(transcriptContent, 5);
+  // A fast failure (e.g. nothing usable was recorded) can come back in well
+  // under a second — rendering the skeleton immediately meant it flashed in
+  // and got yanked out again in that same instant, reading as a glitch
+  // rather than a loading state. Delaying it means a fast round trip never
+  // shows it at all; only a real wait does.
+  const skeletonTimer = setTimeout(() => {
+    renderSkeleton(summaryContent);
+    renderSkeleton(notesContent);
+    renderSkeleton(transcriptContent, 5);
+  }, 500);
 
   const formData = new FormData();
   formData.append("audio", blob, filename);
@@ -505,6 +512,7 @@ async function handleAudioBlob(blob, filename, micBlob, systemBlob) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Transcription failed");
 
+    clearTimeout(skeletonTimer);
     renderTranscript(data);
     setStatus("Transcript ready. Generating summary...", false, true);
     await generateSummary(data.text);
@@ -515,6 +523,7 @@ async function handleAudioBlob(blob, filename, micBlob, systemBlob) {
     // hidden state) stays stuck like this until something else happens to
     // reset it, and starting a new recording would show the new animation
     // stacked on top of this stale, empty results screen.
+    clearTimeout(skeletonTimer);
     setStatus(`Error: ${err.message}`, true);
     showIdleControls(true);
     resultsEl.hidden = true;
@@ -553,8 +562,10 @@ function renderTranscript(data) {
 }
 
 async function generateSummary(transcriptText) {
-  renderSkeleton(summaryContent);
-  renderSkeleton(notesContent);
+  const skeletonTimer = setTimeout(() => {
+    renderSkeleton(summaryContent);
+    renderSkeleton(notesContent);
+  }, 500);
   try {
     const res = await fetch("/api/summarize", {
       method: "POST",
@@ -564,6 +575,7 @@ async function generateSummary(transcriptText) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Summarization failed");
 
+    clearTimeout(skeletonTimer);
     lastResult.title = data.title;
     lastResult.summary = data.summary;
     lastResult.notes = data.notes;
@@ -579,6 +591,7 @@ async function generateSummary(transcriptText) {
     if (notionConfigured) loadNotionPages();
     checkUsageAlert();
   } catch (err) {
+    clearTimeout(skeletonTimer);
     summaryContent.textContent = "";
     notesContent.textContent = "";
     setStatus(`Summary error: ${err.message}`, true);
