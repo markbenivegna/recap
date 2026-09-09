@@ -8,6 +8,7 @@
 # Output: dist/Recap.app
 
 import os
+import shutil
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files
 
@@ -73,6 +74,19 @@ datas += [
     (os.path.join(PROJECT_DIR, "assets", "mic-icon-source.svg"), "assets"),
 ]
 
+# The compiled asset catalog a modern macOS actually reads via
+# CFBundleIconName below (see BUNDLE()'s icon= comment further down) — goes
+# straight into Contents/Resources, same place Xcode would put it. Must be
+# named exactly "Assets.car" there (that's the fixed filename CoreUI/Launch
+# Services looks for — CFBundleIconName only names the icon *within* that
+# catalog, not the file itself); PyInstaller's datas tuples always keep the
+# source basename, so build a correctly-named copy here rather than
+# renaming assets/AppIcon.car itself and losing its real name in git.
+_assets_car_renamed = os.path.join(PROJECT_DIR, "build", "Assets.car")
+os.makedirs(os.path.dirname(_assets_car_renamed), exist_ok=True)
+shutil.copyfile(os.path.join(PROJECT_DIR, "assets", "AppIcon.car"), _assets_car_renamed)
+datas += [(_assets_car_renamed, ".")]
+
 a = Analysis(
     [os.path.join(PROJECT_DIR, "main.py")],
     pathex=[PROJECT_DIR],
@@ -115,13 +129,26 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name="Recap.app",
+    # icon= only ever wires up the legacy .icns (CFBundleIconFile) — it has
+    # no way to place a compiled asset catalog. assets/AppIcon.car (built
+    # from assets/AppIcon.icon, the full-bleed Icon Composer source —  see
+    # generate_icon_fullbleed.py) is the modern format newer macOS expects;
+    # without it actually being in Resources and CFBundleIconName pointing
+    # at it below, the OS falls back to compositing its own squircle/shadow
+    # treatment on top of the legacy .icns, which already has its own
+    # baked-in padding from the old pipeline — the doubled-inset "glass"
+    # border around the icon. Both keys stay set: CFBundleIconName is what
+    # a modern macOS actually renders from, CFBundleIconFile is the
+    # fallback for anything reading the bundle that doesn't know about
+    # asset catalogs.
     icon=os.path.join(PROJECT_DIR, "assets", "AppIcon.icns"),
     bundle_identifier="com.markbenivegna.meetingnotes",
     info_plist={
         "CFBundleName": "Recap",
         "CFBundleDisplayName": "Recap",
-        "CFBundleShortVersionString": "1.1.4",
-        "CFBundleVersion": "1.1.4",
+        "CFBundleIconName": "AppIcon",
+        "CFBundleShortVersionString": "1.1.5",
+        "CFBundleVersion": "1.1.5",
         "NSHighResolutionCapable": True,
         "NSMicrophoneUsageDescription": "Recap needs microphone access to record your meetings.",
         "LSMinimumSystemVersion": "11.0",

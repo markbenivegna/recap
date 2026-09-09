@@ -517,27 +517,21 @@ async function handleAudioBlob(blob, filename, micBlob, systemBlob) {
     setStatus("Transcript ready. Generating summary...", false, true);
     await generateSummary(data.text);
   } catch (err) {
-    // Transcription itself failed (e.g. nothing usable was recorded) — there's
-    // no transcript to show, so go back to the blank state rather than
-    // leaving #results on screen empty. Otherwise it (and newRecordingBtn's
-    // hidden state) stays stuck like this until something else happens to
-    // reset it, and starting a new recording would show the new animation
-    // stacked on top of this stale, empty results screen.
+    // Transcription itself failed (e.g. nothing usable was recorded).
+    // Previously this reverted all the way back to the blank empty-state —
+    // fixing an older bug where #results was left stuck on screen with
+    // nothing rendered into it. Landing on the error banner with idle
+    // controls re-enabled (same as a failed summarize — see generateSummary's
+    // catch below) fixes that same stale-state problem without the jarring
+    // full-screen swap: nothing is left stuck, and Record/Upload are
+    // immediately available again to just try again.
     clearTimeout(skeletonTimer);
-    // clearTimeout only stops a skeleton that hasn't rendered yet — a real
-    // transcription attempt almost always runs past the 500ms delay before
-    // failing, so the shimmer is already live in the DOM here. Clearing it
-    // before hiding #results means no animated element is mid-transition
-    // the instant display:none hits it, which is what actually read as a
-    // glitch/flash rather than a clean cut to the empty state.
     summaryContent.innerHTML = "";
     notesContent.innerHTML = "";
     transcriptContent.innerHTML = "";
     setStatus(`Error: ${err.message}`, true);
     showIdleControls(true);
-    resultsEl.hidden = true;
-    emptyEl.hidden = false;
-    newRecordingBtn.hidden = true;
+    newRecordingBtn.hidden = false;
   }
 }
 

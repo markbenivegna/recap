@@ -1,4 +1,24 @@
-import os
+# Must be the literal first thing that runs in this file, before any other
+# import or top-level statement below (apply_mac_dock_branding(), and the
+# heavy `from backend.app import app` a bit further down, both run
+# unconditionally at module scope, not inside `if __name__ == "__main__":`).
+# Without this, a PyInstaller-frozen build doesn't recognize multiprocessing's
+# own re-exec of this same executable (e.g. `Recap -c "from
+# multiprocessing.resource_tracker import main;main(13)"`, spawned the first
+# time torch/whisper actually touches multiprocessing during a real
+# transcription) as that special invocation — it just runs this whole file
+# again instead. Putting freeze_support() inside the __main__ guard (even as
+# its very first line) was still too late: everything above that guard,
+# Dock icon branding included, had already run by the time it got there,
+# which is exactly why the resource_tracker process was showing up as its
+# own bouncing Dock icon even after a first pass at this fix stopped it from
+# opening a second window. No-op in a normal (non-frozen) `python3 main.py`
+# run, and cheap/side-effect-free either way, so unconditional here is fine.
+import multiprocessing
+
+multiprocessing.freeze_support()
+
+import os  # noqa: E402
 
 APP_NAME = "Recap"
 ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png")
@@ -18,7 +38,15 @@ def apply_mac_dock_branding():
         from Foundation import NSBundle
 
         bundle = NSBundle.mainBundle()
-        if bundle.objectForInfoDictionaryKey_("CFBundleIconFile") == "AppIcon":
+        # PyInstaller's BUNDLE(icon=...) writes the actual filename, extension
+        # included ("AppIcon.icns") — this was checking for the bare stem
+        # ("AppIcon"), which never matched, so this early return never fired
+        # and the manual override two lines below ran on every real launch
+        # too. That's the "redundant repaint" the comment above already
+        # identified as the cause of the icon visibly flashing/redrawing —
+        # this was just never actually skipping it for the one case (a real
+        # packaged launch) it was written to skip.
+        if bundle.objectForInfoDictionaryKey_("CFBundleIconFile") == "AppIcon.icns":
             return  # Real bundle icon already showing correctly — nothing to do.
 
         from AppKit import NSApplication, NSImage
