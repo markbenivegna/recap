@@ -86,6 +86,16 @@
    looking right no matter what else got tuned. */
 button, input, select, textarea {
   font-family: inherit;
+  /* WebKit's own default stylesheet gives a bare <button> margin: 2px —
+     confirmed by measuring a totally unstyled <button> we never touch.
+     That default isn't even consistent: the exact same build of Recap,
+     same macOS, same WebKit framework, computed it as 2px inside the
+     packaged .app's WKWebView but 0px running via `python3 main.py`.
+     Nothing here ever reset it either way, so it was pure luck which
+     one you got — this is what made .tabs and .split-btn measurably
+     bigger in the packaged app than in dev mode despite byte-identical
+     CSS. Pin it to 0 so it can't silently vary again. */
+  margin: 0;
 }
 
 html, body {
