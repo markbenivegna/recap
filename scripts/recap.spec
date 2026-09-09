@@ -64,6 +64,13 @@ datas += collect_data_files("faster_whisper")
 datas += [
     (os.path.join(PROJECT_DIR, "frontend"), "frontend"),
     (os.path.join(PROJECT_DIR, "assets", "icon.png"), "assets"),
+    # backend/menubar.py loads this for the status-bar icon — missing here
+    # meant _load_template_icon() silently failed (open() raising inside
+    # _create()'s broad except) in every packaged build, so the menu bar
+    # icon never appeared despite the "Menu bar icon" setting defaulting on.
+    # Only bit by the packaged app, never `python3 main.py` directly, since
+    # that resolves the same relative path straight off disk.
+    (os.path.join(PROJECT_DIR, "assets", "mic-icon-source.svg"), "assets"),
 ]
 
 a = Analysis(
@@ -113,8 +120,8 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "Recap",
         "CFBundleDisplayName": "Recap",
-        "CFBundleShortVersionString": "1.1.1",
-        "CFBundleVersion": "1.1.1",
+        "CFBundleShortVersionString": "1.1.2",
+        "CFBundleVersion": "1.1.2",
         "NSHighResolutionCapable": True,
         "NSMicrophoneUsageDescription": "Recap needs microphone access to record your meetings.",
         "LSMinimumSystemVersion": "11.0",
