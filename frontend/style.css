@@ -626,19 +626,22 @@ h1 {
   cursor: not-allowed;
 }
 
-/* Fading the button and the caret separately (two independent
-   .btn:disabled opacity rules) looked disjointed — each piece's own
-   shadow faded independently instead of the control reading as one
-   disabled unit. Fade the whole split-btn once instead, and cancel the
-   main button's own disabled opacity so it doesn't compound. Driven by a
-   JS-toggled class (setFileBtnDisabled in app.js) rather than a :has()
-   selector, since :has() didn't reliably apply here in the real app. */
-.split-btn.split-btn-disabled {
+/* Fading the whole .split-btn via one parent opacity (rather than each
+   piece's own .btn:disabled rule) was meant to make it read as one
+   disabled unit instead of two independently-faded pieces. In the real
+   app's WKWebView, though, that parent opacity doesn't actually
+   composite onto .split-btn-caret at all — confirmed directly via
+   getComputedStyle(caret).opacity still reading "1" with the parent at
+   0.5 — so the caret rendered at full saturation next to the properly-
+   faded button, a much worse mismatch than the thing this was trying to
+   avoid. Fading .split-btn-main and .split-btn-caret directly (each its
+   own real opacity, not inherited/composited from a parent) sidesteps
+   that unreliable compositing entirely — driven by the same JS-toggled
+   class (setFileBtnDisabled in app.js) rather than a :has() selector,
+   since :has() didn't reliably apply here either. */
+.split-btn.split-btn-disabled .split-btn-main,
+.split-btn.split-btn-disabled .split-btn-caret {
   opacity: 0.5;
-}
-
-.split-btn.split-btn-disabled .split-btn-main {
-  opacity: 1;
 }
 
 /* Native select styled to match their select-native.tsx: appearance-none
