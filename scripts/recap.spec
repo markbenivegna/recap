@@ -113,8 +113,8 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "Recap",
         "CFBundleDisplayName": "Recap",
-        "CFBundleShortVersionString": "1.0",
-        "CFBundleVersion": "1.0",
+        "CFBundleShortVersionString": "1.1.1",
+        "CFBundleVersion": "1.1.1",
         "NSHighResolutionCapable": True,
         "NSMicrophoneUsageDescription": "Recap needs microphone access to record your meetings.",
         "LSMinimumSystemVersion": "11.0",
