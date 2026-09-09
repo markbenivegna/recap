@@ -279,6 +279,36 @@ h1 {
   to { transform: rotate(360deg); }
 }
 
+/* Shown inside a tab panel while transcribing/summarizing is in progress,
+   in place of leaving it blank behind the status banner's spinner — shimmer
+   lines roughly the shape of the text about to land there read as "working
+   on it" much more clearly than an empty panel does. */
+.skeleton-line {
+  height: 0.9em;
+  border-radius: 4px;
+  margin-bottom: 0.7em;
+  background: linear-gradient(90deg, var(--border) 25%, var(--hover-bg) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+.skeleton-line:last-child {
+  width: 60%;
+  margin-bottom: 0;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line {
+    animation: none;
+    background: var(--border);
+  }
+}
+
 .waveform {
   display: flex;
   align-items: center;

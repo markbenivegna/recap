@@ -108,6 +108,19 @@ function showToast(message, isError = false) {
   }, 2500);
 }
 
+// Fills a panel with shimmer placeholder lines while its real content is
+// still being generated, instead of leaving it visually empty behind the
+// status banner's spinner — the last line is shorter to read as the tail
+// of a paragraph rather than another full-width bar.
+function renderSkeleton(el, lines = 3) {
+  el.innerHTML = "";
+  for (let i = 0; i < lines; i++) {
+    const line = document.createElement("div");
+    line.className = "skeleton-line";
+    el.appendChild(line);
+  }
+}
+
 function formatTimer(ms) {
   const totalSeconds = Math.floor(ms / 1000);
   const mins = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
@@ -478,6 +491,9 @@ async function handleAudioBlob(blob, filename, micBlob, systemBlob) {
   newRecordingBtn.hidden = true;
   showIdleControls(false);
   setStatus("Transcribing locally (this can take a minute)...", false, true);
+  renderSkeleton(summaryContent);
+  renderSkeleton(notesContent);
+  renderSkeleton(transcriptContent, 5);
 
   const formData = new FormData();
   formData.append("audio", blob, filename);
@@ -537,8 +553,8 @@ function renderTranscript(data) {
 }
 
 async function generateSummary(transcriptText) {
-  summaryContent.textContent = "Generating summary with Claude...";
-  notesContent.textContent = "Generating notes with Claude...";
+  renderSkeleton(summaryContent);
+  renderSkeleton(notesContent);
   try {
     const res = await fetch("/api/summarize", {
       method: "POST",
