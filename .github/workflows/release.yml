@@ -43,6 +43,20 @@ jobs:
       - name: Bundle ffmpeg into Recap.app
         run: scripts/bundle_ffmpeg.sh dist/Recap.app
 
+      - name: Re-sign Recap.app
+        # bundle_ffmpeg.sh copies ffmpeg + its dylibs into the bundle AFTER
+        # recap.spec's own BUNDLE step already signed it, which invalidates
+        # that outer signature (the seal no longer matches the bundle's
+        # actual contents). codesign -v alone doesn't catch this locally
+        # because the "sealed resource is missing or invalid" check only
+        # runs when the file is quarantined — i.e. only after a real
+        # browser download, never on a locally built or hot-patched copy.
+        # Confirmed via `spctl -a -vv`: without this step, a downloaded
+        # Recap.app shows macOS's fatal "is damaged, move to Trash" dialog
+        # (no override); with it, the normal, expected, one-time
+        # "Apple could not verify..." dialog with a real Open Anyway path.
+        run: codesign --deep --force -s - dist/Recap.app
+
       - name: Zip Recap.app
         # ditto (not plain zip) preserves the bundle's resource forks/xattrs
         # and codesign metadata correctly — the standard way to zip a real
@@ -55,4 +69,4 @@ jobs:
         run: |
           gh release create "${{ github.ref_name }}" Recap.app.zip \
             --title "Recap ${{ github.ref_name }}" \
-            --notes "Download, unzip, and right-click → Open the first time (Recap isn't notarized — that's a normal one-time macOS Gatekeeper step for an app downloaded outside the App Store, not a warning sign). See the README for what first launch looks like."
+            --notes "Download and unzip, then try to open it — macOS will block it since Recap isn't notarized (a normal one-time step for an app downloaded outside the App Store, not a warning sign). Go to System Settings → Privacy & Security → Security and click Open Anyway next to the mention of Recap, confirm once more, and it opens normally after that. See the README for the full first-launch walkthrough."
