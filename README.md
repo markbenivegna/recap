@@ -32,7 +32,7 @@ someone's real name genuinely gets said in the recording; see
 The easiest way to get Recap: no Python, no Homebrew, no terminal.
 
 1. Grab `Recap.app.zip` from the [latest release](https://github.com/markbenivegna/recap/releases/latest), unzip it, and put `Recap.app` wherever you keep apps.
-2. Right-click (or Control-click) it and choose **Open** — don't just double-click it. macOS will refuse, with a dialog saying **"Recap" Not Opened** — expected, see why below.
+2. Open it (double-click or right-click → Open, either works). macOS will refuse, with a dialog saying **"Recap" Not Opened** — expected, see why below.
 3. Open **System Settings → Privacy & Security**, scroll down to **Security**. You'll see **"Recap" was blocked to protect your Mac** with an **Open Anyway** button next to it — click that.
 4. Confirm once more (Touch ID or your password). Recap opens, and every launch after this one is normal — no more warnings.
 5. See [Configure API keys](#configure-api-keys) below for what happens next.
