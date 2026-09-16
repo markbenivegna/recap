@@ -18,6 +18,17 @@ from backend.paths import CACHE_DIR
 # higher = fewer speakers detected (more likely to merge two voices into one).
 CLUSTER_THRESHOLD = float(os.environ.get("DIARIZATION_THRESHOLD", "0.7"))
 
+# Used only when deciding whether a second mic-side cluster is a real
+# in-person guest sharing the mic, vs. the user's own voice fragmenting
+# into two clusters from ordinary variance (moving relative to the mic,
+# background noise, volume changes). Almost all mic audio genuinely is
+# the user, so this needs to be noticeably more lenient than the general
+# cross-speaker threshold above — otherwise a single real 2-person call
+# (you + one remote person) can come back as 3 "speakers": you split in
+# two, plus the other person. See the merge step in
+# diarize_with_source_separation below.
+YOU_MERGE_THRESHOLD = CLUSTER_THRESHOLD * 1.4
+
 # ECAPA-TDNN (the embedding model below) needs a real run of speech to
 # produce a stable voiceprint — anything much shorter than ~1 second gives a
 # noisy embedding that doesn't reliably represent the actual speaker. With
@@ -279,6 +290,22 @@ def diarize_with_source_separation(mic_path, system_path, segments):
         for label in mic_labels.values():
             counts[label] = counts.get(label, 0) + 1
         you_cluster = max(counts, key=counts.get)
+
+        # Fold any other mic-side cluster back into "You" unless it's
+        # clearly a different voice (see YOU_MERGE_THRESHOLD above) —
+        # without this, ordinary variance in the user's own voice can
+        # split it into two clusters and get reported as a phantom extra
+        # speaker on top of whoever else was actually on the call.
+        mic_centroids = _cluster_centroids(mic_audio, mic_sr, segments, true_mic_indices, mic_labels)
+        you_centroid = mic_centroids.get(you_cluster)
+        if you_centroid is not None:
+            for label, centroid in mic_centroids.items():
+                if label == you_cluster:
+                    continue
+                if _cosine_distance(centroid, you_centroid) < YOU_MERGE_THRESHOLD:
+                    for i in list(mic_labels):
+                        if mic_labels[i] == label:
+                            mic_labels[i] = you_cluster
 
     speaker_names = {}
     next_number = 1
