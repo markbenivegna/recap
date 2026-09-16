@@ -18,7 +18,18 @@ from backend.paths import CACHE_DIR
 # higher = fewer speakers detected (more likely to merge two voices into one).
 CLUSTER_THRESHOLD = float(os.environ.get("DIARIZATION_THRESHOLD", "0.7"))
 
-MIN_SEGMENT_SECONDS = 0.3
+# ECAPA-TDNN (the embedding model below) needs a real run of speech to
+# produce a stable voiceprint — anything much shorter than ~1 second gives a
+# noisy embedding that doesn't reliably represent the actual speaker. With
+# this at 0.3s, real meetings full of short back-and-forth ("yeah", "right",
+# quick interjections) were feeding a lot of these unreliable embeddings
+# straight into clustering, each one liable to land far enough from its
+# true speaker's other segments to spawn its own spurious cluster — a real
+# 3-person meeting coming back diarized as 26 "speakers". Segments shorter
+# than this now skip embedding entirely and inherit the nearest prior
+# label instead (see _embed_and_cluster below), which is a better guess
+# than a noisy embedding for something this short anyway.
+MIN_SEGMENT_SECONDS = 1.2
 
 _model = None
 

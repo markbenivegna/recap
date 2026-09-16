@@ -477,6 +477,7 @@ function resetToNewRecording() {
   transcriptContent.innerHTML = "";
   notionSelect.innerHTML = '<option value="">Loading pages...</option>';
   setFileBtnDisabled(true);
+  downloadBtn.disabled = true;
   fileStatus.textContent = "";
   switchTab("summary");
   setStatus("");
@@ -490,6 +491,7 @@ async function handleAudioBlob(blob, filename, micBlob, systemBlob) {
   resultsEl.hidden = false;
   newRecordingBtn.hidden = true;
   showIdleControls(false);
+  downloadBtn.disabled = true;
   setStatus("Transcribing locally (this can take a minute)...", false, true);
   // A fast failure (e.g. nothing usable was recorded) can come back in well
   // under a second — rendering the skeleton immediately meant it flashed in
@@ -591,6 +593,7 @@ async function generateSummary(transcriptText) {
     switchTab("summary");
     setStatus("");
     newRecordingBtn.hidden = false;
+    downloadBtn.disabled = false;
     if (notionConfigured) loadNotionPages();
     checkUsageAlert();
   } catch (err) {
