@@ -591,7 +591,15 @@ async function generateSummary(transcriptText) {
       meetingTitleEl.hidden = false;
     }
     switchTab("summary");
-    setStatus("");
+    // A truncated summary isn't a failure (everything up to the cutoff is
+    // real and usable), but it may be silently missing something like a
+    // deadline mentioned late in a long meeting — worth a visible, sticky
+    // warning rather than the normal empty/cleared status, so it isn't
+    // mistaken for a complete, trustworthy result.
+    setStatus(
+      data.truncated ? "Summary may be incomplete — the meeting was long enough to hit the response limit." : "",
+      Boolean(data.truncated),
+    );
     newRecordingBtn.hidden = false;
     downloadBtn.disabled = false;
     if (notionConfigured) loadNotionPages();

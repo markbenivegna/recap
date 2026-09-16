@@ -28,6 +28,12 @@ when a point has supporting detail worth breaking out, e.g.:
    - Format every section heading (including "Action Items") as its own line wrapped in double \
 asterisks, e.g. **Budget Planning**.
 
+Always preserve specific, concrete details exactly as mentioned — deadlines and dates, dollar \
+amounts, names, version numbers, and anything else precise. These are usually the actual point of \
+an action item or decision; a summary that generalizes "ship pricing copy by Friday" down to just \
+"ship pricing copy" has thrown away the one detail that made it actionable. When in doubt, keep the \
+specific detail in rather than trim it for brevity.
+
 The transcript's turns are labeled by voice, like "Speaker 1:" or "Speaker 2:" — these are \
 automatically detected voices, not necessarily correct or stable if a speaker is briefly silent. \
 If someone's real name becomes clear from what's actually said (introductions, being addressed \
@@ -62,7 +68,12 @@ def summarize_transcript(transcript_text):
     client = _client()
     message = client.messages.create(
         model=MODEL,
-        max_tokens=1500,
+        # A long real meeting (many topics, each with its own section and
+        # action items) can genuinely need more than the 1500 this used to
+        # be capped at — a cap that low risked silently truncating notes
+        # for exactly the meetings most worth summarizing well, dropping
+        # whatever didn't fit (e.g. a deadline mentioned near the end).
+        max_tokens=4096,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": f"Transcript:\n\n{transcript_text}"}],
     )
@@ -70,7 +81,14 @@ def summarize_transcript(transcript_text):
     record_usage(MODEL, message.usage.input_tokens, message.usage.output_tokens)
 
     raw = "".join(block.text for block in message.content if block.type == "text")
-    return _parse_response(raw)
+    result = _parse_response(raw)
+    # If the model ran out of room before finishing, say so rather than
+    # silently handing back notes that just stop mid-thought — this is the
+    # concrete, checkable version of the truncation risk max_tokens above
+    # is already sized to avoid, not a replacement for that fix.
+    if message.stop_reason == "max_tokens":
+        result["truncated"] = True
+    return result
 
 
 def _parse_response(raw):
