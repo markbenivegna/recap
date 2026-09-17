@@ -18,16 +18,28 @@ from backend.paths import CACHE_DIR
 # higher = fewer speakers detected (more likely to merge two voices into one).
 CLUSTER_THRESHOLD = float(os.environ.get("DIARIZATION_THRESHOLD", "0.7"))
 
-# Used only when deciding whether a second mic-side cluster is a real
-# in-person guest sharing the mic, vs. the user's own voice fragmenting
-# into two clusters from ordinary variance (moving relative to the mic,
-# background noise, volume changes). Almost all mic audio genuinely is
-# the user, so this needs to be noticeably more lenient than the general
-# cross-speaker threshold above — otherwise a single real 2-person call
-# (you + one remote person) can come back as 3 "speakers": you split in
-# two, plus the other person. See the merge step in
-# diarize_with_source_separation below.
-YOU_MERGE_THRESHOLD = CLUSTER_THRESHOLD * 1.4
+# AgglomerativeClustering's "average" linkage decides whether to merge two
+# clusters based on the *average* pairwise distance between every embedding
+# in one and every embedding in the other. Over a whole real meeting, one
+# real person's voice can still end up split across two clusters this way —
+# not because any single pair of their segments looked unlike each other,
+# but because enough individual noisy pairs (different energy, distance
+# from the mic, background noise at that moment) pushed the *average*
+# above CLUSTER_THRESHOLD, even though the two clusters' overall centroids
+# — averaged over many segments each, so far less noisy than any one
+# pairwise comparison — are actually close. A single real standup with 5
+# people came back with 15+ "speakers" this way: not sub-second fragments
+# (MIN_SEGMENT_SECONDS below already handles those), real substantial
+# utterances, repeatedly minting a new speaker instead of matching one
+# already seen earlier in the meeting.
+#
+# _consolidate_clusters (below) is a second, coarser pass on top of the
+# first: after clustering, merge any two clusters whose centroids —
+# not their individual members — are within this more lenient bound.
+# Deliberately looser than CLUSTER_THRESHOLD, since a centroid-to-centroid
+# comparison is the more reliable signal and this pass's whole job is to
+# catch what the noisier pairwise comparisons above missed.
+MERGE_THRESHOLD = CLUSTER_THRESHOLD * 1.4
 
 # ECAPA-TDNN (the embedding model below) needs a real run of speech to
 # produce a stable voiceprint — anything much shorter than ~1 second gives a
@@ -127,6 +139,37 @@ def _cosine_distance(a, b):
     return 1.0 - float(np.dot(a, b) / denom)
 
 
+def _consolidate_clusters(embeddings, embedded_indices, label_by_index):
+    """Second pass on top of an initial clustering (see MERGE_THRESHOLD's
+    comment for why this is needed): merge any two clusters whose mean
+    embeddings — not their individual members — land within
+    MERGE_THRESHOLD of each other. Mutates `label_by_index` in place.
+    """
+    # Group embeddings by their initial cluster label so we can average
+    # each cluster's own embeddings into one centroid.
+    by_label = {}
+    for i, idx in enumerate(embedded_indices):
+        by_label.setdefault(label_by_index[idx], []).append(embeddings[i])
+    centroids = {label: np.mean(embs, axis=0) for label, embs in by_label.items()}
+
+    merged = True
+    while merged and len(centroids) > 1:
+        merged = False
+        labels_list = list(centroids)
+        for i, label_a in enumerate(labels_list):
+            if label_a not in centroids:
+                continue
+            for label_b in labels_list[i + 1 :]:
+                if label_b not in centroids:
+                    continue
+                if _cosine_distance(centroids[label_a], centroids[label_b]) < MERGE_THRESHOLD:
+                    for idx, lbl in label_by_index.items():
+                        if lbl == label_b:
+                            label_by_index[idx] = label_a
+                    del centroids[label_b]
+                    merged = True
+
+
 def _rms(audio, sample_rate, start, end):
     clip = audio[int(start * sample_rate) : int(end * sample_rate)]
     return float(np.sqrt(np.mean(clip**2))) if len(clip) else 0.0
@@ -181,6 +224,7 @@ def _embed_and_cluster(audio, sample_rate, segments, indices):
         )
         labels = clustering.fit_predict(stacked)
         label_by_index = dict(zip(embedded_indices, labels))
+        _consolidate_clusters(embeddings, embedded_indices, label_by_index)
 
     result = {}
     last_label = 0
@@ -278,6 +322,10 @@ def diarize_with_source_separation(mic_path, system_path, segments):
         else:
             true_mic_indices.append(i)
 
+    # _embed_and_cluster already runs the MERGE_THRESHOLD consolidation
+    # pass internally, so ordinary variance in the user's own voice (or
+    # anyone else genuinely sharing the mic) is folded back together
+    # there rather than needing a separate step here.
     mic_labels = _embed_and_cluster(mic_audio, mic_sr, segments, true_mic_indices)
 
     # After removing leaked segments, whatever's left on the mic side should
@@ -290,22 +338,6 @@ def diarize_with_source_separation(mic_path, system_path, segments):
         for label in mic_labels.values():
             counts[label] = counts.get(label, 0) + 1
         you_cluster = max(counts, key=counts.get)
-
-        # Fold any other mic-side cluster back into "You" unless it's
-        # clearly a different voice (see YOU_MERGE_THRESHOLD above) —
-        # without this, ordinary variance in the user's own voice can
-        # split it into two clusters and get reported as a phantom extra
-        # speaker on top of whoever else was actually on the call.
-        mic_centroids = _cluster_centroids(mic_audio, mic_sr, segments, true_mic_indices, mic_labels)
-        you_centroid = mic_centroids.get(you_cluster)
-        if you_centroid is not None:
-            for label, centroid in mic_centroids.items():
-                if label == you_cluster:
-                    continue
-                if _cosine_distance(centroid, you_centroid) < YOU_MERGE_THRESHOLD:
-                    for i in list(mic_labels):
-                        if mic_labels[i] == label:
-                            mic_labels[i] = you_cluster
 
     speaker_names = {}
     next_number = 1
