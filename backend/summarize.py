@@ -68,12 +68,15 @@ def summarize_transcript(transcript_text):
     client = _client()
     message = client.messages.create(
         model=MODEL,
-        # A long real meeting (many topics, each with its own section and
-        # action items) can genuinely need more than the 1500 this used to
-        # be capped at — a cap that low risked silently truncating notes
-        # for exactly the meetings most worth summarizing well, dropping
-        # whatever didn't fit (e.g. a deadline mentioned near the end).
-        max_tokens=4096,
+        # 1500, then 4096, both still truncated on a real ~80min meeting -
+        # this is a non-streaming request, and Anthropic's own guidance
+        # for those is up to ~16000 before HTTP timeouts become a risk
+        # (Sonnet 5 itself supports up to 128K output, but that requires
+        # streaming, which this synchronous endpoint doesn't do). 16000
+        # is comfortably more than even a long meeting's summary+notes
+        # should ever need, without restructuring this into a streaming
+        # call.
+        max_tokens=16000,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": f"Transcript:\n\n{transcript_text}"}],
     )

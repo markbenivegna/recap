@@ -144,6 +144,19 @@ def _consolidate_clusters(embeddings, embedded_indices, label_by_index):
     comment for why this is needed): merge any two clusters whose mean
     embeddings — not their individual members — land within
     MERGE_THRESHOLD of each other. Mutates `label_by_index` in place.
+
+    Only merges when one of the two clusters is clearly a minority
+    fragment of the other (see _is_fragment below), not just because their
+    centroids happen to be close — two real, comparably-sized clusters
+    (e.g. a second person who spoke substantially through part of a
+    meeting) are a real second speaker far more often than they're one
+    voice's variance, even when MERGE_THRESHOLD alone would call them
+    close enough. Confirmed against real use: without this size check, a
+    whole genuine conversation between the user and a real third person
+    got folded into an existing speaker instead of staying its own
+    "Speaker N" — exactly the opposite failure from the one this pass was
+    added to fix (see f89a927), just with the leniency turned too far the
+    other way.
     """
     # Group embeddings by their initial cluster label so we can average
     # each cluster's own embeddings into one centroid.
@@ -151,6 +164,15 @@ def _consolidate_clusters(embeddings, embedded_indices, label_by_index):
     for i, idx in enumerate(embedded_indices):
         by_label.setdefault(label_by_index[idx], []).append(embeddings[i])
     centroids = {label: np.mean(embs, axis=0) for label, embs in by_label.items()}
+    sizes = {label: len(embs) for label, embs in by_label.items()}
+
+    def _is_fragment(label_a, label_b):
+        smaller, larger = sorted((sizes[label_a], sizes[label_b]))
+        # A handful of segments (natural variance splitting off a few
+        # utterances) folds back in; a real ongoing exchange - several
+        # segments and a meaningful fraction of the larger cluster's size
+        # - does not, regardless of how close the centroids land.
+        return smaller <= 3 and smaller <= larger * 0.25
 
     merged = True
     while merged and len(centroids) > 1:
@@ -162,11 +184,18 @@ def _consolidate_clusters(embeddings, embedded_indices, label_by_index):
             for label_b in labels_list[i + 1 :]:
                 if label_b not in centroids:
                     continue
+                if not _is_fragment(label_a, label_b):
+                    continue
                 if _cosine_distance(centroids[label_a], centroids[label_b]) < MERGE_THRESHOLD:
+                    # Keep whichever label is the larger cluster so the
+                    # surviving label is the well-established one.
+                    keep, drop = (label_a, label_b) if sizes[label_a] >= sizes[label_b] else (label_b, label_a)
                     for idx, lbl in label_by_index.items():
-                        if lbl == label_b:
-                            label_by_index[idx] = label_a
-                    del centroids[label_b]
+                        if lbl == drop:
+                            label_by_index[idx] = keep
+                    sizes[keep] += sizes[drop]
+                    del centroids[drop]
+                    del sizes[drop]
                     merged = True
 
 
