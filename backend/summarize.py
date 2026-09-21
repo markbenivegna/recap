@@ -14,17 +14,18 @@ discussed (e.g. "Q3 Roadmap Planning", "Client Onboarding Call: Acme Corp"). Not
 2. A concise summary — a few sentences describing what the meeting was about and the outcome.
 3. Structured notes as markdown, organized like this:
    - Start with an "**Action Items**" section (skip it entirely if there genuinely aren't any) — \
-this always comes first, before anything else.
+this always comes first, before anything else. Action Items is always bullets, one per line — \
+these become checkable to-do items, not prose.
    - After that, break the rest of the discussion into your own topic-specific section headings, \
 named for what was actually discussed (e.g. "Budget Planning", "Hiring Timeline for Q3", "Client \
 Feedback on the V2 Design") — not generic labels like "Key Points" or "Decisions". Use as many \
 sections as make sense for how the conversation actually flowed; a short meeting might only need \
 one or two.
-   - Within a section, use a nested sub-bullet (indent it two extra spaces under its parent bullet) \
-when a point has supporting detail worth breaking out, e.g.:
-     - Main point
-       - Supporting detail
-       - Another supporting detail
+   - Write each of those sections as normal prose paragraphs under its heading, the way you'd \
+actually describe what was discussed and decided — not a bullet for every sentence. Reach for \
+bullets within a section only when the content is genuinely list-shaped (e.g. several distinct, \
+parallel short items, or a nested sub-point breaking out supporting detail under a bullet already \
+in use) — bullets should be the exception inside a topic section, not the default structure.
    - Format every section heading (including "Action Items") as its own line wrapped in double \
 asterisks, e.g. **Budget Planning**.
 

@@ -84,6 +84,13 @@ let recording = false;
 let timerInterval = null;
 let recordingStart = null;
 
+// Wall-clock time the *current transcript's* recording actually started,
+// so transcript timestamps can be shown aligned to real meeting time
+// instead of just elapsed mm:ss. Set from `recordingStart` for a real
+// recording; left null for an uploaded file, which has no meaningful
+// "recording start" of its own.
+let transcriptRecordingStart = null;
+
 let lastResult = null; // { summary, notes, text, segments }
 
 function setStatus(message, isError = false, showSpinner = false) {
@@ -395,7 +402,7 @@ async function startRecording() {
       const blob = new Blob(recordedChunks, { type: "audio/webm" });
       const micBlob = micChunks.length ? new Blob(micChunks, { type: "audio/webm" }) : null;
       const systemBlob = systemChunks.length ? new Blob(systemChunks, { type: "audio/webm" }) : null;
-      handleAudioBlob(blob, "recording.webm", micBlob, systemBlob);
+      handleAudioBlob(blob, "recording.webm", micBlob, systemBlob, recordingStart);
     });
 
     mediaRecorder.start();
@@ -485,7 +492,8 @@ function resetToNewRecording() {
 
 newRecordingBtn.addEventListener("click", resetToNewRecording);
 
-async function handleAudioBlob(blob, filename, micBlob, systemBlob) {
+async function handleAudioBlob(blob, filename, micBlob, systemBlob, startedAt = null) {
+  transcriptRecordingStart = startedAt;
   emptyEl.hidden = true;
   stopRecordingAnimation();
   resultsEl.hidden = false;
@@ -549,7 +557,18 @@ function renderTranscript(data) {
     timeSpan.className = "transcript-time";
     const mins = String(Math.floor(seg.start / 60)).padStart(2, "0");
     const secs = String(Math.floor(seg.start % 60)).padStart(2, "0");
-    timeSpan.textContent = `${mins}:${secs}`;
+    const elapsed = `${mins}:${secs}`;
+    if (transcriptRecordingStart) {
+      // Aligned to when the meeting actually started, not just elapsed
+      // time into the recording — a real recording has a real wall-clock
+      // start time to anchor to; an uploaded file doesn't, so it always
+      // falls back to plain elapsed time instead.
+      const wallClock = new Date(transcriptRecordingStart + seg.start * 1000);
+      timeSpan.textContent = wallClock.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      timeSpan.title = `${elapsed} into the recording`;
+    } else {
+      timeSpan.textContent = elapsed;
+    }
     div.appendChild(timeSpan);
 
     if (seg.speaker && seg.speaker !== lastSpeaker) {
