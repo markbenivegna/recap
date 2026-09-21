@@ -351,10 +351,6 @@ def diarize_with_source_separation(mic_path, system_path, segments):
         else:
             true_mic_indices.append(i)
 
-    # _embed_and_cluster already runs the MERGE_THRESHOLD consolidation
-    # pass internally, so ordinary variance in the user's own voice (or
-    # anyone else genuinely sharing the mic) is folded back together
-    # there rather than needing a separate step here.
     mic_labels = _embed_and_cluster(mic_audio, mic_sr, segments, true_mic_indices)
 
     # After removing leaked segments, whatever's left on the mic side should
@@ -367,6 +363,32 @@ def diarize_with_source_separation(mic_path, system_path, segments):
         for label in mic_labels.values():
             counts[label] = counts.get(label, 0) + 1
         you_cluster = max(counts, key=counts.get)
+
+        # _embed_and_cluster's own consolidation pass requires the smaller
+        # cluster to look like a minority fragment (see _is_fragment) —
+        # the right call for telling two real, different people apart,
+        # but too strict here: the mic-side prior is fundamentally
+        # different, since almost all mic audio genuinely is the user
+        # regardless of how big a second cluster is, unless it's clearly
+        # a different voice. Without this, a real second mic-side
+        # cluster of the user's own voice (moving relative to the mic,
+        # volume changes) stayed its own "Speaker N" and the transcript
+        # showed the same person as both "You" and a numbered speaker.
+        # So: fold any other mic cluster into You whenever it's close
+        # enough, with no size requirement — this is deliberately more
+        # lenient than the general pass, specifically because "is this
+        # still you" starts from a much stronger prior than "are these
+        # two clusters the same stranger".
+        mic_centroids = _cluster_centroids(mic_audio, mic_sr, segments, true_mic_indices, mic_labels)
+        you_centroid = mic_centroids.get(you_cluster)
+        if you_centroid is not None:
+            for label, centroid in mic_centroids.items():
+                if label == you_cluster:
+                    continue
+                if _cosine_distance(centroid, you_centroid) < MERGE_THRESHOLD:
+                    for i in list(mic_labels):
+                        if mic_labels[i] == label:
+                            mic_labels[i] = you_cluster
 
     speaker_names = {}
     next_number = 1
