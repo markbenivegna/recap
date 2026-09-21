@@ -73,7 +73,11 @@ def list_pages():
 
 
 _BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
-_HEADER_LINE_RE = re.compile(r"^\*\*(.+)\*\*$")
+# Trailing colon tolerated ("**Action Items:**") - a natural enough thing for
+# Claude to write that requiring an exact "**Action Items**" with nothing
+# else on the line was silently missing real headings, in turn silently
+# skipping the to_do conversion below entirely.
+_HEADER_LINE_RE = re.compile(r"^\*\*(.+?)\*\*:?$")
 
 
 def _inline_rich_text(text):
@@ -128,7 +132,12 @@ def _markdown_to_blocks(text):
             )
         elif line.startswith("- ") or line.startswith("* "):
             rich_text = _inline_rich_text(line[2:].strip()[:2000])
-            if current_section == "action items":
+            # Substring, not exact equality - the prompt asks for exactly
+            # "Action Items", but real output has drifted from that before
+            # ("Action Items:", "Key Action Items", ...) and an exact match
+            # silently falls back to plain, unchecked bullets with no sign
+            # anything went wrong.
+            if current_section and "action item" in current_section:
                 blocks.append(
                     {
                         "object": "block",

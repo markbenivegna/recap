@@ -374,18 +374,28 @@ def diarize_with_source_separation(mic_path, system_path, segments):
         # cluster of the user's own voice (moving relative to the mic,
         # volume changes) stayed its own "Speaker N" and the transcript
         # showed the same person as both "You" and a numbered speaker.
+        #
         # So: fold any other mic cluster into You whenever it's close
-        # enough, with no size requirement — this is deliberately more
-        # lenient than the general pass, specifically because "is this
-        # still you" starts from a much stronger prior than "are these
-        # two clusters the same stranger".
+        # enough, with no size requirement — but "close enough" here is
+        # CLUSTER_THRESHOLD, not the more lenient MERGE_THRESHOLD the
+        # general pass uses. Real measured same-person variance (the
+        # same voice at two different volumes/tones) lands around 0.22 -
+        # nowhere near even 0.7 - because a centroid comparison averages
+        # away the noise that made the *initial* pairwise-average-linkage
+        # clustering split them in the first place. That's plenty of
+        # room to catch a genuine same-person split without reaching for
+        # MERGE_THRESHOLD's extra leniency, which risked folding in a
+        # real in-person guest who just happens to sound somewhat
+        # similar. If a real same-person split ever needs more room than
+        # this catches, that's a real signal to revisit - not something
+        # to pre-emptively loosen for.
         mic_centroids = _cluster_centroids(mic_audio, mic_sr, segments, true_mic_indices, mic_labels)
         you_centroid = mic_centroids.get(you_cluster)
         if you_centroid is not None:
             for label, centroid in mic_centroids.items():
                 if label == you_cluster:
                     continue
-                if _cosine_distance(centroid, you_centroid) < MERGE_THRESHOLD:
+                if _cosine_distance(centroid, you_centroid) < CLUSTER_THRESHOLD:
                     for i in list(mic_labels):
                         if mic_labels[i] == label:
                             mic_labels[i] = you_cluster
