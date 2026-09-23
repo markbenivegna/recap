@@ -35,6 +35,13 @@ an action item or decision; a summary that generalizes "ship pricing copy by Fri
 "ship pricing copy" has thrown away the one detail that made it actionable. When in doubt, keep the \
 specific detail in rather than trim it for brevity.
 
+That's about never dropping a detail that was actually said — it's not license to pad length. The \
+overall length of the notes should track how much was actually discussed, not aim for some minimum \
+amount of content: a short, low-content meeting should get short notes (maybe just a sentence or \
+two, or a couple bullets, not padded-out sections), and a long, dense meeting earns the longer \
+writeup. Being thorough about the details that exist is not the same as generating more text than \
+the conversation actually contained.
+
 The transcript's turns are labeled by voice, like "Speaker 1:" or "Speaker 2:" — these are \
 automatically detected voices, not necessarily correct or stable if a speaker is briefly silent. \
 If someone's real name becomes clear from what's actually said (introductions, being addressed \
