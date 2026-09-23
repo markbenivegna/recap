@@ -18,9 +18,15 @@ from backend.transcribe import transcribe_audio
 RECORDING_OUTPUT_DEVICE = os.environ.get("RECORDING_OUTPUT_DEVICE", "")
 
 
-def _meeting_title(raw_title):
+def _meeting_title(raw_title, recorded_at_ms=None):
     meeting_title = (raw_title or "").strip()
-    formatted_date = datetime.now().strftime("%-m/%-d/%Y at %-I:%M %p")
+    # recorded_at_ms is when the recording actually started (client-side
+    # Date.now(), in milliseconds) — using that instead of the current
+    # time means the title reflects the meeting itself, not whenever the
+    # user happened to click File/Save afterward, which can be minutes or
+    # much longer after the meeting actually ended.
+    when = datetime.fromtimestamp(recorded_at_ms / 1000) if recorded_at_ms else datetime.now()
+    formatted_date = when.strftime("%-m/%-d/%Y at %-I:%M %p")
     return f"{meeting_title} - {formatted_date}" if meeting_title else f"Meeting Notes - {formatted_date}"
 
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
@@ -202,7 +208,7 @@ def api_notion_file():
     summary = data.get("summary", "")
     notes = data.get("notes", "")
     transcript = data.get("transcript", "")
-    title = _meeting_title(data.get("title"))
+    title = _meeting_title(data.get("title"), data.get("recorded_at"))
 
     if not parent_id:
         return jsonify({"error": "parent_id is required"}), 400
@@ -220,7 +226,7 @@ def api_download_markdown():
     summary = data.get("summary", "")
     notes = data.get("notes", "")
     transcript = data.get("transcript", "")
-    title = _meeting_title(data.get("title"))
+    title = _meeting_title(data.get("title"), data.get("recorded_at"))
     suggested_name = markdown_export.safe_filename(title) + ".md"
 
     try:

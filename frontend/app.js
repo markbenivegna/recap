@@ -690,6 +690,7 @@ fileBtn.addEventListener("click", async () => {
         summary: lastResult.summary,
         notes: lastResult.notes,
         transcript: lastResult.text,
+        recorded_at: transcriptRecordingStart,
       }),
     });
     const data = await res.json();
@@ -898,6 +899,7 @@ downloadBtn.addEventListener("click", async () => {
         summary: lastResult.summary,
         notes: lastResult.notes,
         transcript: lastResult.text,
+        recorded_at: transcriptRecordingStart,
       }),
     });
     const data = await res.json();
