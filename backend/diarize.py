@@ -41,6 +41,21 @@ CLUSTER_THRESHOLD = float(os.environ.get("DIARIZATION_THRESHOLD", "0.7"))
 # catch what the noisier pairwise comparisons above missed.
 MERGE_THRESHOLD = CLUSTER_THRESHOLD * 1.4
 
+# Minimum RMS (on _rms_normalize'd audio, target=0.1) for a clip to be
+# considered loud enough to embed reliably — only meaningful for the
+# dual-stream mic/system path, where normalization is guaranteed. Real
+# speech in an actual recording measured well above 0.07; a genuinely
+# unreliable, barely-audible utterance measured at 0.012. This sits
+# comfortably between the two.
+MIN_EMBED_RMS = 0.02
+
+# For the leak-reclassification check in diarize_with_source_separation:
+# something has to actually be audible on the system channel for a mic
+# segment's voice to plausibly be leaked from it in the first place, not
+# just embedding similarity alone. See that function for the real
+# evidence this caught.
+LEAK_MIN_SYSTEM_RMS = 0.01
+
 # ECAPA-TDNN (the embedding model below) needs a real run of speech to
 # produce a stable voiceprint — anything much shorter than ~1 second gives a
 # noisy embedding that doesn't reliably represent the actual speaker. With
@@ -121,11 +136,20 @@ def _load_audio_mono(file_path):
     return audio, sample_rate
 
 
-def _embed_clip(audio, sample_rate, start, end):
-    """Embed one segment's audio clip, or None if it's too short to embed
-    reliably."""
+def _embed_clip(audio, sample_rate, start, end, min_rms=None):
+    """Embed one segment's audio clip, or None if it's too short — or, when
+    `min_rms` is given (only meaningful for RMS-normalized audio, e.g. the
+    dual-stream mic/system path), too quiet — to embed reliably. A very
+    faint utterance is unreliable for the same underlying reason a very
+    short one is: not enough real signal in the clip for a stable
+    voiceprint, just via loudness instead of duration. Confirmed against a
+    real recording: a single 2-second "well" at roughly a tenth the RMS of
+    normal speech in that same meeting produced an embedding that didn't
+    match anyone, becoming its own phantom one-segment "speaker"."""
     clip = audio[int(start * sample_rate) : int(end * sample_rate)]
     if len(clip) < sample_rate * MIN_SEGMENT_SECONDS:
+        return None
+    if min_rms is not None and (len(clip) == 0 or float(np.sqrt(np.mean(clip**2))) < min_rms):
         return None
     tensor = torch.from_numpy(clip).unsqueeze(0)
     with torch.no_grad():
@@ -221,11 +245,12 @@ def _rms_normalize(audio, target=0.1):
     return audio * (target / overall_rms)
 
 
-def _embed_and_cluster(audio, sample_rate, segments, indices):
+def _embed_and_cluster(audio, sample_rate, segments, indices, min_rms=None):
     """Cluster the given subset of segment indices by speaker embedding.
     Returns {index: local_cluster_id} (0-based, only meaningful within this
-    call) for every index in `indices`. Segments too short to embed
-    reliably inherit the nearest prior label within this same subset."""
+    call) for every index in `indices`. Segments too short (or, with
+    `min_rms` set, too quiet) to embed reliably inherit the nearest prior
+    label within this same subset."""
     if not indices:
         return {}
 
@@ -233,7 +258,7 @@ def _embed_and_cluster(audio, sample_rate, segments, indices):
     embedded_indices = []
     for i in indices:
         seg = segments[i]
-        emb = _embed_clip(audio, sample_rate, seg["start"], seg["end"])
+        emb = _embed_clip(audio, sample_rate, seg["start"], seg["end"], min_rms=min_rms)
         if emb is not None:
             embeddings.append(emb)
             embedded_indices.append(i)
@@ -264,13 +289,13 @@ def _embed_and_cluster(audio, sample_rate, segments, indices):
     return result
 
 
-def _cluster_centroids(audio, sample_rate, segments, indices, labels):
+def _cluster_centroids(audio, sample_rate, segments, indices, labels, min_rms=None):
     """Mean embedding per cluster label, for matching other audio against
     these voices later."""
     buckets = {}
     for i in indices:
         seg = segments[i]
-        emb = _embed_clip(audio, sample_rate, seg["start"], seg["end"])
+        emb = _embed_clip(audio, sample_rate, seg["start"], seg["end"], min_rms=min_rms)
         if emb is None:
             continue
         buckets.setdefault(labels[i], []).append(emb)
@@ -331,17 +356,33 @@ def diarize_with_source_separation(mic_path, system_path, segments):
         sys_level = _rms(sys_audio, sys_sr, seg["start"], seg["end"])
         (mic_indices if mic_level >= sys_level else system_indices).append(i)
 
-    system_labels = _embed_and_cluster(sys_audio, sys_sr, segments, system_indices)
-    system_centroids = _cluster_centroids(sys_audio, sys_sr, segments, system_indices, system_labels)
+    system_labels = _embed_and_cluster(sys_audio, sys_sr, segments, system_indices, min_rms=MIN_EMBED_RMS)
+    system_centroids = _cluster_centroids(
+        sys_audio, sys_sr, segments, system_indices, system_labels, min_rms=MIN_EMBED_RMS
+    )
 
     # Mic-side segments whose voice actually matches a known system-audio
     # voice are leaked/bled-through audio, not the user — reclassify them
     # to that speaker rather than lumping them in with the user's own voice.
+    #
+    # But that's only physically possible if something was actually
+    # audible on the system-audio channel at that moment for it to leak
+    # from — real evidence caught this misfiring on genuine, continuous
+    # user speech: distances of 0.65-0.68 (under CLUSTER_THRESHOLD) got
+    # real "You" segments reclassified as a system speaker, while the
+    # system channel's RMS at those exact same moments was ~0.0004 -
+    # silence, nowhere near the ~0.07+ a real playing voice measures at.
+    # There was nothing to leak. A single embedding comparison alone
+    # isn't enough evidence; require audible system output at the same
+    # moment as a precondition, not just voice similarity.
     true_mic_indices = []
     reclassified = {}
     for i in mic_indices:
         seg = segments[i]
-        emb = _embed_clip(mic_audio, mic_sr, seg["start"], seg["end"])
+        if _rms(sys_audio, sys_sr, seg["start"], seg["end"]) < LEAK_MIN_SYSTEM_RMS:
+            true_mic_indices.append(i)
+            continue
+        emb = _embed_clip(mic_audio, mic_sr, seg["start"], seg["end"], min_rms=MIN_EMBED_RMS)
         if emb is None or not system_centroids:
             true_mic_indices.append(i)
             continue
@@ -351,7 +392,7 @@ def diarize_with_source_separation(mic_path, system_path, segments):
         else:
             true_mic_indices.append(i)
 
-    mic_labels = _embed_and_cluster(mic_audio, mic_sr, segments, true_mic_indices)
+    mic_labels = _embed_and_cluster(mic_audio, mic_sr, segments, true_mic_indices, min_rms=MIN_EMBED_RMS)
 
     # After removing leaked segments, whatever's left on the mic side should
     # overwhelmingly be one consistent voice — the user's. If someone else
@@ -389,7 +430,9 @@ def diarize_with_source_separation(mic_path, system_path, segments):
         # similar. If a real same-person split ever needs more room than
         # this catches, that's a real signal to revisit - not something
         # to pre-emptively loosen for.
-        mic_centroids = _cluster_centroids(mic_audio, mic_sr, segments, true_mic_indices, mic_labels)
+        mic_centroids = _cluster_centroids(
+            mic_audio, mic_sr, segments, true_mic_indices, mic_labels, min_rms=MIN_EMBED_RMS
+        )
         you_centroid = mic_centroids.get(you_cluster)
         if you_centroid is not None:
             for label, centroid in mic_centroids.items():
