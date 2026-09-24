@@ -4,11 +4,6 @@ from faster_whisper import WhisperModel
 
 MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "small")
 
-# Comma-separated names/nicknames/jargon Whisper otherwise mishears (e.g.
-# "Mando Man" -> "Mando", "Ghoul" -> "Google") — biases transcription
-# toward these specific words without needing a bigger, slower model.
-VOCABULARY_HINTS = os.environ.get("VOCABULARY_HINTS", "").strip()
-
 _model = None
 
 
@@ -22,11 +17,19 @@ def get_model():
 
 def transcribe_audio(file_path):
     model = get_model()
+    # Read fresh on every call, not once at import — Settings can update
+    # this via VOCABULARY_HINTS in os.environ at any point after startup,
+    # and a module-level constant would never pick that change up.
+    # Comma-separated names/nicknames/jargon Whisper otherwise mishears
+    # (e.g. "Mando Man" -> "Mando", "Ghoul" -> "Google") — biases
+    # transcription toward these specific words without needing a bigger,
+    # slower model.
+    vocabulary_hints = os.environ.get("VOCABULARY_HINTS", "").strip()
     try:
         segments, info = model.transcribe(
             file_path,
             beam_size=5,
-            initial_prompt=VOCABULARY_HINTS or None,
+            initial_prompt=vocabulary_hints or None,
             # Without this, silence/near-silence gets fed to the decoder
             # like any other audio, and with nothing real to anchor on it
             # tends to hallucinate — often echoing back exactly the
