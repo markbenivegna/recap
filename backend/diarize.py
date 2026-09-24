@@ -361,6 +361,28 @@ def diarize_with_source_separation(mic_path, system_path, segments):
         sys_audio, sys_sr, segments, system_indices, system_labels, min_rms=MIN_EMBED_RMS
     )
 
+    # A provisional, unfiltered clustering of every mic-side segment, used
+    # only to get a rough "this is what the user's own voice looks like"
+    # reference before any leak filtering happens. Without this, the leak
+    # check below has nothing to compare a candidate match against except
+    # an absolute threshold — and real evidence showed that's not enough:
+    # short, early segments of genuine, continuous user speech matched an
+    # unrelated system voice at distances of 0.59-0.70 (just under
+    # CLUSTER_THRESHOLD) purely from embedding noise on a short clip, while
+    # actually sitting at 0.18-0.56 from what the user's own voice turned
+    # out to be — a far closer match that was simply never considered.
+    provisional_mic_labels = _embed_and_cluster(mic_audio, mic_sr, segments, mic_indices, min_rms=MIN_EMBED_RMS)
+    provisional_you_centroid = None
+    if provisional_mic_labels:
+        counts = {}
+        for label in provisional_mic_labels.values():
+            counts[label] = counts.get(label, 0) + 1
+        provisional_you = max(counts, key=counts.get)
+        provisional_centroids = _cluster_centroids(
+            mic_audio, mic_sr, segments, mic_indices, provisional_mic_labels, min_rms=MIN_EMBED_RMS
+        )
+        provisional_you_centroid = provisional_centroids.get(provisional_you)
+
     # Mic-side segments whose voice actually matches a known system-audio
     # voice are leaked/bled-through audio, not the user — reclassify them
     # to that speaker rather than lumping them in with the user's own voice.
@@ -375,6 +397,12 @@ def diarize_with_source_separation(mic_path, system_path, segments):
     # There was nothing to leak. A single embedding comparison alone
     # isn't enough evidence; require audible system output at the same
     # moment as a precondition, not just voice similarity.
+    #
+    # Even with that precondition, a match under the absolute threshold
+    # isn't enough on its own — it also has to be a *better* match than
+    # the user's own provisional voiceprint above, or a noisy short clip
+    # of the user's real voice can still get stolen just for happening to
+    # land under CLUSTER_THRESHOLD against some unrelated system speaker.
     true_mic_indices = []
     reclassified = {}
     for i in mic_indices:
@@ -387,7 +415,12 @@ def diarize_with_source_separation(mic_path, system_path, segments):
             true_mic_indices.append(i)
             continue
         best_label = min(system_centroids, key=lambda label: _cosine_distance(emb, system_centroids[label]))
-        if _cosine_distance(emb, system_centroids[best_label]) < CLUSTER_THRESHOLD:
+        best_dist = _cosine_distance(emb, system_centroids[best_label])
+        closer_to_you = (
+            provisional_you_centroid is not None
+            and _cosine_distance(emb, provisional_you_centroid) <= best_dist
+        )
+        if best_dist < CLUSTER_THRESHOLD and not closer_to_you:
             reclassified[i] = best_label
         else:
             true_mic_indices.append(i)
