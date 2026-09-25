@@ -221,6 +221,17 @@ def _consolidate_clusters(embeddings, embedded_indices, label_by_index):
                     del centroids[drop]
                     del sizes[drop]
                     merged = True
+                    if drop == label_a:
+                        # label_a itself just got merged away — every
+                        # remaining label_b in this inner loop would look it
+                        # up in sizes/centroids and KeyError, since the
+                        # `label_a not in centroids` guard above only runs
+                        # once per label_a, before this inner loop starts,
+                        # not after a merge happens partway through it. The
+                        # outer while-loop already restarts with a fresh
+                        # labels_list on the next pass, so bailing out here
+                        # is enough to pick this back up correctly.
+                        break
 
 
 def _rms(audio, sample_rate, start, end):
