@@ -415,6 +415,12 @@ h1 {
   margin-bottom: 20px;
 }
 
+.empty-state-icon-error {
+  color: #d92d20;
+  background: color-mix(in srgb, #d92d20 12%, transparent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, #d92d20 6%, transparent);
+}
+
 .empty-state-title {
   font-size: 16px;
   font-weight: 600;
@@ -427,6 +433,12 @@ h1 {
   color: var(--muted);
   margin: 0;
   max-width: 320px;
+}
+
+.empty-state-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
 }
 
 /* Fills .content and lays out title/tabs (fixed) above the active panel

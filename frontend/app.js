@@ -12,6 +12,10 @@ const recordingAnimationEl = document.getElementById("recordingAnimation");
 const recordingAnimationCanvas = document.getElementById("recordingAnimationCanvas");
 const recordingAnimationTextEl = document.getElementById("recordingAnimationText");
 const resultsEl = document.getElementById("results");
+const transcribeErrorEl = document.getElementById("transcribeError");
+const transcribeErrorTextEl = document.getElementById("transcribeErrorText");
+const retryTranscribeBtn = document.getElementById("retryTranscribeBtn");
+const transcribeErrorStartOverBtn = document.getElementById("transcribeErrorStartOverBtn");
 const meetingTitleEl = document.getElementById("meetingTitle");
 const summaryContent = document.getElementById("summaryContent");
 const notesContent = document.getElementById("notesContent");
@@ -92,6 +96,7 @@ let recordingStart = null;
 let transcriptRecordingStart = null;
 
 let lastResult = null; // { summary, notes, text, segments }
+let lastFailedAudioArgs = null; // args to re-run handleAudioBlob with, for Retry
 
 function setStatus(message, isError = false, showSpinner = false) {
   if (!message) {
@@ -473,7 +478,9 @@ function showIdleControls(show) {
 
 function resetToNewRecording() {
   lastResult = null;
+  lastFailedAudioArgs = null;
   resultsEl.hidden = true;
+  transcribeErrorEl.hidden = true;
   newRecordingBtn.hidden = true;
   showIdleControls(true);
   emptyEl.hidden = false;
@@ -495,6 +502,7 @@ newRecordingBtn.addEventListener("click", resetToNewRecording);
 async function handleAudioBlob(blob, filename, micBlob, systemBlob, startedAt = null) {
   transcriptRecordingStart = startedAt;
   emptyEl.hidden = true;
+  transcribeErrorEl.hidden = true;
   stopRecordingAnimation();
   resultsEl.hidden = false;
   newRecordingBtn.hidden = true;
@@ -527,23 +535,34 @@ async function handleAudioBlob(blob, filename, micBlob, systemBlob, startedAt = 
     setStatus("Transcript ready. Generating summary...", false, true);
     await generateSummary(data.text);
   } catch (err) {
-    // Transcription itself failed (e.g. nothing usable was recorded).
-    // Previously this reverted all the way back to the blank empty-state —
-    // fixing an older bug where #results was left stuck on screen with
-    // nothing rendered into it. Landing on the error banner with idle
-    // controls re-enabled (same as a failed summarize — see generateSummary's
-    // catch below) fixes that same stale-state problem without the jarring
-    // full-screen swap: nothing is left stuck, and Record/Upload are
-    // immediately available again to just try again.
+    // Transcription itself failed (e.g. nothing usable was recorded, or a
+    // real backend error). Previously this landed on the normal Record/
+    // Upload toolbar with an empty, still-visible #results panel behind an
+    // error banner — a dead-end-looking screen with a full set of controls
+    // that don't actually do anything useful about the failure in front of
+    // you. A dedicated error state with a Retry button is more honest about
+    // what actually happened and what to do about it: re-run the exact
+    // same request (stored below) without needing to re-record or
+    // re-select the file.
     clearTimeout(skeletonTimer);
     summaryContent.innerHTML = "";
     notesContent.innerHTML = "";
     transcriptContent.innerHTML = "";
-    setStatus(`Error: ${err.message}`, true);
-    showIdleControls(true);
-    newRecordingBtn.hidden = false;
+    setStatus("");
+    lastFailedAudioArgs = { blob, filename, micBlob, systemBlob, startedAt };
+    resultsEl.hidden = true;
+    transcribeErrorTextEl.textContent = err.message;
+    transcribeErrorEl.hidden = false;
   }
 }
+
+retryTranscribeBtn.addEventListener("click", () => {
+  if (!lastFailedAudioArgs) return;
+  const { blob, filename, micBlob, systemBlob, startedAt } = lastFailedAudioArgs;
+  handleAudioBlob(blob, filename, micBlob, systemBlob, startedAt);
+});
+
+transcribeErrorStartOverBtn.addEventListener("click", resetToNewRecording);
 
 function renderTranscript(data) {
   lastResult = { ...lastResult, text: data.text, segments: data.segments };

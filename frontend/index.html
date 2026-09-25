@@ -26,7 +26,7 @@
       <button id="newRecordingBtn" class="btn btn-primary" hidden>New Recording</button>
       <button id="recordBtn" class="btn btn-record">Record</button>
       <label id="uploadLabel" class="btn btn-secondary file-label">
-        Upload audio
+        Upload Audio
         <input id="fileInput" type="file" accept="audio/*" hidden />
       </label>
       <button id="settingsBtn" class="btn btn-icon" title="Settings" aria-label="Settings">
@@ -214,6 +214,22 @@
       <div id="recordingAnimationCanvas" class="recording-animation-canvas"></div>
       <h2 class="empty-state-title">Recording&hellip;</h2>
       <p id="recordingAnimationText" class="empty-state-text"></p>
+    </div>
+
+    <div id="transcribeError" class="empty-state" hidden>
+      <div class="empty-state-icon empty-state-icon-error">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <h2 class="empty-state-title">Transcription failed</h2>
+      <p id="transcribeErrorText" class="empty-state-text"></p>
+      <div class="empty-state-actions">
+        <button id="retryTranscribeBtn" class="btn btn-primary" type="button">Retry</button>
+        <button id="transcribeErrorStartOverBtn" class="btn btn-secondary" type="button">Start Over</button>
+      </div>
     </div>
 
     <div id="results" hidden>
