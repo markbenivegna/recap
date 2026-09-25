@@ -37,6 +37,13 @@ def transcribe_audio(file_path):
             # been said. VAD strips non-speech before it reaches the
             # decoder at all.
             vad_filter=True,
+            # A Whisper segment's boundaries reflect pause detection, not
+            # who's talking — two people trading quick turns (e.g. "can you
+            # hear me now?" / "yep, there we go") easily land in the same
+            # segment. Dual-stream diarization needs per-word timing to
+            # split a segment like that at the real speaker change instead
+            # of routing the whole blended segment to one channel.
+            word_timestamps=True,
         )
         segment_list = []
         full_text_parts = []
@@ -46,6 +53,10 @@ def transcribe_audio(file_path):
                     "start": round(segment.start, 2),
                     "end": round(segment.end, 2),
                     "text": segment.text.strip(),
+                    "words": [
+                        {"start": round(w.start, 2), "end": round(w.end, 2), "word": w.word}
+                        for w in (segment.words or [])
+                    ],
                 }
             )
             full_text_parts.append(segment.text.strip())

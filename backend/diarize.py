@@ -330,8 +330,65 @@ def diarize_segments(file_path, segments):
 
     for i, seg in enumerate(segments):
         seg["speaker"] = f"Speaker {label_by_index.get(i, 0) + 1}"
+        seg.pop("words", None)
 
     return segments
+
+
+def _resegment_by_channel(segments, mic_audio, mic_sr, sys_audio, sys_sr):
+    """Split each segment at points where the louder channel changes from
+    one word to the next, instead of routing the whole segment to one
+    channel based on its overall average RMS.
+
+    A Whisper segment's boundaries come from pause detection, not from who
+    is talking — two people trading quick turns (e.g. "can you hear me
+    now?" / "yep, there we go") easily land inside the same segment. RMS-
+    averaging that whole blended segment routes it entirely to whichever
+    channel happened to be louder on average, stealing one person's words
+    into the other's. Real evidence: a real call-opening segment measured
+    mic=0.087 vs sys=0.130 — genuinely close, not a clean signal either
+    way, because it blended both people's short exchange into one 12-
+    second span. Routing per word instead means only the words that were
+    actually louder on a channel get attributed to it.
+
+    Segments without word-level timestamps (or with only one word) pass
+    through unchanged. Drops the "words" key either way — nothing
+    downstream needs per-word data past this point.
+    """
+    new_segments = []
+    for seg in segments:
+        words = seg.get("words") or []
+        if len(words) < 2:
+            new_segments.append({k: v for k, v in seg.items() if k != "words"})
+            continue
+
+        runs = []
+        for w in words:
+            mic_level = _rms(mic_audio, mic_sr, w["start"], w["end"])
+            sys_level = _rms(sys_audio, sys_sr, w["start"], w["end"])
+            route = "mic" if mic_level >= sys_level else "sys"
+            if runs and runs[-1][0] == route:
+                runs[-1][1].append(w)
+            else:
+                runs.append((route, [w]))
+
+        if len(runs) == 1:
+            new_segments.append({k: v for k, v in seg.items() if k != "words"})
+            continue
+
+        for _, run_words in runs:
+            text = "".join(w["word"] for w in run_words).strip()
+            if not text:
+                continue
+            new_segments.append(
+                {
+                    "start": run_words[0]["start"],
+                    "end": run_words[-1]["end"],
+                    "text": text,
+                }
+            )
+
+    return new_segments
 
 
 def diarize_with_source_separation(mic_path, system_path, segments):
@@ -360,6 +417,8 @@ def diarize_with_source_separation(mic_path, system_path, segments):
     sys_audio, sys_sr = _load_audio_mono(system_path)
     mic_audio = _rms_normalize(mic_audio)
     sys_audio = _rms_normalize(sys_audio)
+
+    segments[:] = _resegment_by_channel(segments, mic_audio, mic_sr, sys_audio, sys_sr)
 
     mic_indices, system_indices = [], []
     for i, seg in enumerate(segments):
