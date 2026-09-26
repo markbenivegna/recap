@@ -335,6 +335,52 @@ def diarize_segments(file_path, segments):
     return segments
 
 
+def _smooth_word_runs(runs):
+    """Absorb single-word runs into whichever neighboring run is longer,
+    before splitting on channel changes.
+
+    Per-word RMS is noisy — a brief pause or breath mid-sentence can let
+    the other channel's ambient floor momentarily read louder, flipping a
+    single word's route even in the middle of one person's uninterrupted
+    turn. Confirmed against real output: normal continuous speech like
+    "...just kind of giving me a little bit of an update on what you're
+    working on..." was getting shredded into single-word runs alternating
+    speakers every word or two — not a real speaker change, just RMS
+    noise on isolated words. A genuine speaker change (the actual bug this
+    resegmentation fixes) produces a run of several consecutive words on
+    the new channel, not a single flickering word, so absorbing only
+    length-1 runs into their longer neighbor fixes the noise without
+    undoing the real fix.
+    """
+    runs = [(route, list(words)) for route, words in runs]
+    changed = True
+    while changed and len(runs) > 1:
+        changed = False
+        for i, (_, words) in enumerate(runs):
+            if len(words) > 1:
+                continue
+            prev_len = len(runs[i - 1][1]) if i > 0 else -1
+            next_len = len(runs[i + 1][1]) if i < len(runs) - 1 else -1
+            target = i - 1 if prev_len >= next_len else i + 1
+            target_route = runs[target][0]
+            merged_words = sorted(runs[target][1] + words, key=lambda w: w["start"])
+            runs[target] = (target_route, merged_words)
+            del runs[i]
+            changed = True
+            break
+
+    # Merging can leave two adjacent runs on the same route (e.g. a
+    # flickered word absorbed leftward now sits between two same-route
+    # runs) — collapse those back into one.
+    collapsed = []
+    for route, words in runs:
+        if collapsed and collapsed[-1][0] == route:
+            collapsed[-1] = (route, collapsed[-1][1] + words)
+        else:
+            collapsed.append((route, words))
+    return collapsed
+
+
 def _resegment_by_channel(segments, mic_audio, mic_sr, sys_audio, sys_sr):
     """Split each segment at points where the louder channel changes from
     one word to the next, instead of routing the whole segment to one
@@ -371,6 +417,8 @@ def _resegment_by_channel(segments, mic_audio, mic_sr, sys_audio, sys_sr):
                 runs[-1][1].append(w)
             else:
                 runs.append((route, [w]))
+
+        runs = _smooth_word_runs(runs)
 
         if len(runs) == 1:
             new_segments.append({k: v for k, v in seg.items() if k != "words"})
