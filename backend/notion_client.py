@@ -181,36 +181,78 @@ def _chunk_text(text, size=1900):
     return [text[i : i + size] for i in range(0, len(text), size)] or [""]
 
 
+_BLOCK_CHAR_BUDGET = 1900
+
+
 def _transcript_toggle(transcript):
     """A collapsed toggle block holding the full transcript, so an hour-plus
     meeting doesn't dominate the page — everyone sees Summary/Notes first
-    and opens the transcript only if they need it. Each speaker turn (from
-    format_transcript_with_speakers) becomes its own paragraph with the
-    speaker label bolded; falls back to blind chunking for plain,
-    non-diarized transcripts (e.g. if diarization failed for that recording)."""
+    and opens the transcript only if they need it. Falls back to blind
+    chunking for plain, non-diarized transcripts (e.g. if diarization
+    failed for that recording).
+
+    Consecutive speaker turns are batched into a shared paragraph block,
+    joined by a literal newline, instead of always giving every turn its
+    own block — Notion renders visible spacing between separate blocks,
+    so a transcript full of short, quick back-and-forth turns (a real
+    conversation, not one person monologuing) turned into a long stack of
+    loosely-spaced one-liners instead of reading like a normal transcript.
+    A newline inside one block's rich text is a soft line break with much
+    tighter spacing. Turns keep batching into the same block until adding
+    another would cross Notion's per-block size budget, then a new block
+    starts."""
     turns = transcript.split("\n\n") if "\n\n" in transcript else [transcript]
 
-    chunks = []
+    block_pieces = []  # list of rich-text-piece lists, one per output block
+    current = []
+    current_len = 0
+
+    def flush():
+        nonlocal current, current_len
+        if current:
+            block_pieces.append(current)
+        current = []
+        current_len = 0
+
     for turn in turns:
         match = _SPEAKER_TURN_RE.match(turn)
-        if match:
-            speaker, body = match.group(1), match.group(2)
+        if not match:
+            for piece in _chunk_text(turn):
+                flush()
+                block_pieces.append([{"type": "text", "text": {"content": piece}}])
+            continue
+
+        speaker, body = match.group(1), match.group(2)
+        turn_len = len(speaker) + 2 + len(body)
+
+        if turn_len > _BLOCK_CHAR_BUDGET:
+            # Too long to ever share a block — flush whatever's pending
+            # and give it its own dedicated, chunked block(s).
+            flush()
             for i, piece in enumerate(_chunk_text(body)):
                 rich_text = (
                     [{"type": "text", "text": {"content": f"{speaker}: "}, "annotations": {"bold": True}}]
                     if i == 0
                     else []
                 ) + [{"type": "text", "text": {"content": piece}}]
-                chunks.append({"object": "block", "type": "paragraph", "paragraph": {"rich_text": rich_text}})
-        else:
-            for piece in _chunk_text(turn):
-                chunks.append(
-                    {
-                        "object": "block",
-                        "type": "paragraph",
-                        "paragraph": {"rich_text": [{"type": "text", "text": {"content": piece}}]},
-                    }
-                )
+                block_pieces.append(rich_text)
+            continue
+
+        if current and current_len + 1 + turn_len > _BLOCK_CHAR_BUDGET:
+            flush()
+        if current:
+            current.append({"type": "text", "text": {"content": "\n"}})
+            current_len += 1
+        current.append({"type": "text", "text": {"content": f"{speaker}: "}, "annotations": {"bold": True}})
+        current.append({"type": "text", "text": {"content": body}})
+        current_len += turn_len
+
+    flush()
+
+    chunks = [
+        {"object": "block", "type": "paragraph", "paragraph": {"rich_text": rich_text}}
+        for rich_text in block_pieces
+    ]
 
     # Notion allows at most 100 children per block; trim if a transcript is extreme.
     chunks = chunks[:100]
