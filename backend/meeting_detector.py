@@ -106,8 +106,23 @@ def _on_start_recording_clicked():
     # Dispatching to a plain background thread first sidesteps it entirely:
     # evaluate_js's blocking wait is safe from any thread that isn't the
     # one the callAfter callback itself needs to run on.
-    if _window is not None:
-        threading.Thread(target=_click_record_button, daemon=True).start()
+    if _window is None:
+        return
+
+    # Show the window before clicking Record, not after — a hidden window's
+    # WKWebView is occluded, and WebKit throttles/suspends an occluded
+    # page's JS execution and live media capture. Real evidence: clicking
+    # this notification action while the window stayed hidden recorded
+    # several minutes of near-silent mic audio before actually picking up
+    # properly, only once the window was manually opened. Calling
+    # show_window() here (main thread, fire-and-forget — see above) before
+    # dispatching the click means recording only actually starts once the
+    # webview is genuinely visible, instead of starting "blind" and hoping
+    # capture works while occluded.
+    from backend import menubar
+
+    menubar.show_window()
+    threading.Thread(target=_click_record_button, daemon=True).start()
 
 
 notifications.register_action("meeting_detected", _on_start_recording_clicked)
