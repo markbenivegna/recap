@@ -18,6 +18,23 @@ def _headers():
     }
 
 
+def _raise_for_status(resp):
+    """Like resp.raise_for_status(), but surfaces Notion's own error detail
+    (e.g. "body.children[4].paragraph.rich_text[2].text.content.length
+    should be ≤ 2000") instead of just "400 Client Error: Bad Request for
+    url: ...". requests.HTTPError's default message throws away the
+    response body entirely, which turns any real failure here into a dead
+    end with nothing to actually debug from."""
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as exc:
+        try:
+            detail = resp.json().get("message", resp.text)
+        except ValueError:
+            detail = resp.text
+        raise requests.HTTPError(f"{exc}: {detail}", response=resp) from exc
+
+
 def _title_from_object(obj):
     props = obj.get("properties", {})
     for prop in props.values():
@@ -43,7 +60,7 @@ def list_pages():
         },
         timeout=15,
     )
-    resp.raise_for_status()
+    _raise_for_status(resp)
     results = resp.json().get("results", [])
 
     # A page's own `parent` is almost never actually the workspace root —
@@ -277,7 +294,7 @@ def _heading(text):
 
 def _title_property_key(database_id):
     resp = requests.get(f"{NOTION_API_BASE}/databases/{database_id}", headers=_headers(), timeout=15)
-    resp.raise_for_status()
+    _raise_for_status(resp)
     for name, prop in resp.json().get("properties", {}).items():
         if prop.get("type") == "title":
             return name
@@ -310,6 +327,6 @@ def create_meeting_page(parent_id, parent_type, title, summary, notes, transcrip
         json={"parent": parent, "properties": properties, "children": children},
         timeout=30,
     )
-    resp.raise_for_status()
+    _raise_for_status(resp)
     data = resp.json()
     return {"id": data["id"], "url": data.get("url")}
