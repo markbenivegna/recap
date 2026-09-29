@@ -335,50 +335,69 @@ def diarize_segments(file_path, segments):
     return segments
 
 
+# A candidate mic run needs to clear both of these before it's trusted as
+# real mic speech rather than noise-floor variance — see _smooth_word_runs.
+# Real evidence: genuine mic speech (confirmed against a stretch where the
+# user was unambiguously talking, system silent) ran 2.4-12.3s per run.
+# False positives (noise-floor coincidences beating a quiet/silent system
+# reading) were consistently under 1s and 2-4 words — raising the bar
+# from an initial 2 words/0.5s (too permissive, still let many through)
+# to match the real/false gap actually observed, not just clear it.
+MIN_MIC_RUN_WORDS = 4
+MIN_MIC_RUN_SECONDS = 1.2
+
+# Below this, a word is real silence on that channel, not quiet content —
+# comparing two near-zero RMS values (e.g. mic=0.001 vs sys=0.0002) and
+# calling the larger one "mic" is comparing noise-floor jitter, not voice.
+MIN_WORD_RMS = 0.005
+
+# A gap this long between two consecutive same-route words means they
+# aren't really one continuous utterance, just two words that happened to
+# land on the same side of a coin flip with genuine silence between them —
+# grouping them into one run would inflate its apparent duration/word
+# count with dead air instead of real, continuous speech.
+MAX_WORD_GAP_SECONDS = 1.0
+
+
 def _smooth_word_runs(runs):
-    """Absorb single-word runs into whichever neighboring run is longer,
-    before splitting on channel changes.
+    """Reject low-confidence "mic" runs back to "sys" by default, instead
+    of trusting per-word RMS on its own.
 
-    Per-word RMS is noisy — a brief pause or breath mid-sentence can let
-    the other channel's ambient floor momentarily read louder, flipping a
-    single word's route even in the middle of one person's uninterrupted
-    turn. Confirmed against real output: normal continuous speech like
-    "...just kind of giving me a little bit of an update on what you're
-    working on..." was getting shredded into single-word runs alternating
-    speakers every word or two — not a real speaker change, just RMS
-    noise on isolated words. A genuine speaker change (the actual bug this
-    resegmentation fixes) produces a run of several consecutive words on
-    the new channel, not a single flickering word, so absorbing only
-    length-1 runs into their longer neighbor fixes the noise without
-    undoing the real fix.
+    Per-word RMS is noisy on both sides, but not symmetrically: the mic's
+    own ambient/self noise floor sits in roughly the same 0.01-0.05 RMS
+    range whether or not the user is actually talking, while system audio
+    is only near-silent during the real gaps *between* someone else's
+    words. Any time one of those gaps lines up with an ordinary tick of
+    mic noise, that single word "wins" the mic comparison by default, not
+    because anything was said. Confirmed against real output: an isolated
+    word inside another person's continuous sentence (system audio loud
+    on every surrounding word) flipped to "mic" purely because system
+    happened to dip to near-zero for that one word's timespan, while mic
+    sat at its ordinary, unremarkable noise-floor level - not meaningfully
+    different from its level on all the surrounding (correctly-routed)
+    system words.
+
+    An earlier version of this function tried to fix that by merging
+    short runs into "whichever neighboring run is longer" - but that
+    comparison is itself unreliable: a real single word next to a noise
+    blip is also short, and the merge direction is order-dependent, so a
+    real word could get absorbed into the noise blip's route instead of
+    the other way around (confirmed happening in practice). Requiring
+    real, independent evidence - several consecutive words, not just one,
+    spanning real time, not one flickering instant - avoids relying on
+    that fragile comparison at all. A false "sys" on a genuinely quiet
+    word is a much smaller cost than a false "mic" attribution.
     """
-    runs = [(route, list(words)) for route, words in runs]
-    changed = True
-    while changed and len(runs) > 1:
-        changed = False
-        for i, (_, words) in enumerate(runs):
-            if len(words) > 1:
-                continue
-            prev_len = len(runs[i - 1][1]) if i > 0 else -1
-            next_len = len(runs[i + 1][1]) if i < len(runs) - 1 else -1
-            target = i - 1 if prev_len >= next_len else i + 1
-            target_route = runs[target][0]
-            merged_words = sorted(runs[target][1] + words, key=lambda w: w["start"])
-            runs[target] = (target_route, merged_words)
-            del runs[i]
-            changed = True
-            break
-
-    # Merging can leave two adjacent runs on the same route (e.g. a
-    # flickered word absorbed leftward now sits between two same-route
-    # runs) — collapse those back into one.
-    collapsed = []
+    accepted = []
     for route, words in runs:
-        if collapsed and collapsed[-1][0] == route:
-            collapsed[-1] = (route, collapsed[-1][1] + words)
+        duration = words[-1]["end"] - words[0]["start"]
+        if route == "mic" and (len(words) < MIN_MIC_RUN_WORDS or duration < MIN_MIC_RUN_SECONDS):
+            route = "sys"
+        if accepted and accepted[-1][0] == route:
+            accepted[-1] = (route, accepted[-1][1] + words)
         else:
-            collapsed.append((route, words))
-    return collapsed
+            accepted.append((route, words))
+    return accepted
 
 
 def _resegment_by_channel(segments, mic_audio, mic_sr, sys_audio, sys_sr):
@@ -412,8 +431,14 @@ def _resegment_by_channel(segments, mic_audio, mic_sr, sys_audio, sys_sr):
         for w in words:
             mic_level = _rms(mic_audio, mic_sr, w["start"], w["end"])
             sys_level = _rms(sys_audio, sys_sr, w["start"], w["end"])
-            route = "mic" if mic_level >= sys_level else "sys"
-            if runs and runs[-1][0] == route:
+            # A word with real system audio never gets to "win" mic just by
+            # mic edging out an even-lower sys reading — mic has to clear
+            # its own floor too, or this is two near-zero noise readings
+            # being compared as if one of them were real content.
+            route = "mic" if mic_level >= sys_level and mic_level >= MIN_WORD_RMS else "sys"
+            same_route = runs and runs[-1][0] == route
+            no_big_gap = runs and (w["start"] - runs[-1][1][-1]["end"]) <= MAX_WORD_GAP_SECONDS
+            if same_route and no_big_gap:
                 runs[-1][1].append(w)
             else:
                 runs.append((route, [w]))
