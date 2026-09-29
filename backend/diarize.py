@@ -41,6 +41,18 @@ CLUSTER_THRESHOLD = float(os.environ.get("DIARIZATION_THRESHOLD", "0.7"))
 # catch what the noisier pairwise comparisons above missed.
 MERGE_THRESHOLD = CLUSTER_THRESHOLD * 1.4
 
+# Even two large, comparably-sized clusters get merged regardless of the
+# fragment-size requirement below when their centroids land this close —
+# real evidence: two same-person clusters (89 and 64 real segments each,
+# neither remotely a "fragment") measured 0.103 apart, well under half the
+# ~0.22 same-person variance already established this session, and nowhere
+# near any confirmed different-people distance (consistently 0.5+). A
+# match this tight cannot plausibly be two different people no matter how
+# large either cluster is; the fragment-size gate exists to protect against
+# genuine ambiguity in the 0.7-0.98 range, not against evidence this
+# one-sided.
+HIGH_CONFIDENCE_MERGE_THRESHOLD = 0.35
+
 # Minimum RMS (on _rms_normalize'd audio, target=0.1) for a clip to be
 # considered loud enough to embed reliably — only meaningful for the
 # dual-stream mic/system path, where normalization is guaranteed. Real
@@ -208,9 +220,11 @@ def _consolidate_clusters(embeddings, embedded_indices, label_by_index):
             for label_b in labels_list[i + 1 :]:
                 if label_b not in centroids:
                     continue
-                if not _is_fragment(label_a, label_b):
+                distance = _cosine_distance(centroids[label_a], centroids[label_b])
+                high_confidence = distance < HIGH_CONFIDENCE_MERGE_THRESHOLD
+                if not high_confidence and not _is_fragment(label_a, label_b):
                     continue
-                if _cosine_distance(centroids[label_a], centroids[label_b]) < MERGE_THRESHOLD:
+                if high_confidence or distance < MERGE_THRESHOLD:
                     # Keep whichever label is the larger cluster so the
                     # surviving label is the well-established one.
                     keep, drop = (label_a, label_b) if sizes[label_a] >= sizes[label_b] else (label_b, label_a)
@@ -618,6 +632,32 @@ def diarize_with_source_separation(mic_path, system_path, segments):
                     for i in list(mic_labels):
                         if mic_labels[i] == label:
                             mic_labels[i] = you_cluster
+
+        # A remaining non-You mic cluster might still be the same real
+        # person as an existing system-side speaker, heard through a
+        # different channel at a different point in the meeting (e.g.
+        # physically in the room for part of it, remote for the rest) -
+        # not a live "leak", so the leak-reclassification above never gets
+        # a chance to catch it (system audio isn't necessarily audible at
+        # the same moment this person is on mic). Real evidence: a 108-
+        # segment mic-only cluster and an 89-segment system-only cluster
+        # measured 0.103 apart - system silent (0.0000 RMS) throughout the
+        # mic cluster's segments, ruling out live leak entirely, yet
+        # unambiguously the same voice. Only merge on the same tight,
+        # high-confidence bound used for same-channel consolidation -
+        # this is a cross-channel identity match, not a fragment call.
+        mic_centroids = _cluster_centroids(
+            mic_audio, mic_sr, segments, true_mic_indices, mic_labels, min_rms=MIN_EMBED_RMS
+        )
+        for label, centroid in list(mic_centroids.items()):
+            if label == you_cluster or not system_centroids:
+                continue
+            best_label = min(system_centroids, key=lambda l: _cosine_distance(centroid, system_centroids[l]))
+            if _cosine_distance(centroid, system_centroids[best_label]) < HIGH_CONFIDENCE_MERGE_THRESHOLD:
+                for i in list(mic_labels):
+                    if mic_labels[i] == label:
+                        reclassified[i] = best_label
+                        del mic_labels[i]
 
     speaker_names = {}
     next_number = 1
