@@ -1384,7 +1384,7 @@ h1 {
   animation: toast-in 150ms ease-out;
 }
 
-.audio-tip {
+.flag {
   position: fixed;
   bottom: 24px;
   left: 24px;
@@ -1396,31 +1396,31 @@ h1 {
   color: var(--text);
   box-shadow: 0 0 0 1px var(--border), var(--shadow-lg);
   font-size: 13px;
-  animation: audio-tip-in 150ms ease-out;
+  animation: flag-in 150ms ease-out;
 }
 
-.audio-tip[hidden],
-.audio-tip .btn[hidden] {
+.flag[hidden],
+.flag .btn[hidden] {
   display: none;
 }
 
-.audio-tip-title {
+.flag-title {
   font-weight: 600;
   margin-bottom: 4px;
 }
 
-.audio-tip-body {
+.flag-body {
   margin: 0 0 12px;
   color: var(--muted);
   line-height: 1.45;
 }
 
-.audio-tip-body a {
+.flag-body a {
   color: inherit;
   text-decoration: underline;
 }
 
-.audio-tip-body code,
+.flag-body code,
 .field small code {
   white-space: nowrap;
 }
@@ -1433,11 +1433,18 @@ h1 {
   color: var(--muted);
 }
 
-.audio-tip-actions a.btn {
+.flag-actions a.btn {
   text-decoration: none;
 }
 
-.audio-tip-actions {
+/* Left-aligned action: pulled out by the button's own padding so its text
+   lines up with the title above, while the hover fill still has room. */
+.flag-actions .flag-action-start {
+  margin-right: auto;
+  margin-left: -14px;
+}
+
+.flag-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -1452,7 +1459,7 @@ h1 {
   box-shadow: 0 0 0 1px #d92d20, var(--shadow-lg);
 }
 
-@keyframes audio-tip-in {
+@keyframes flag-in {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }

@@ -120,9 +120,10 @@ function setStatus(message, isError = false, showSpinner = false) {
   statusSpinnerEl.hidden = !showSpinner;
 }
 
-const audioTipEl = document.getElementById("audioTip");
-const audioTipIgnoreBtn = document.getElementById("audioTipIgnoreBtn");
-const audioTipDismissBtn = document.getElementById("audioTipDismissBtn");
+const flagEl = document.getElementById("flag");
+const flagTitleEl = document.getElementById("flagTitle");
+const flagBodyEl = document.getElementById("flagBody");
+const flagActionsEl = document.getElementById("flagActions");
 
 function saveConfigFlags(flags) {
   return fetch("/api/settings", {
@@ -131,6 +132,46 @@ function saveConfigFlags(flags) {
     body: JSON.stringify(flags),
   }).catch(() => {});
 }
+
+// A "flag" is the small notice pinned to the lower left, for things worth
+// noticing but not worth a modal. Only one shows at a time; a new one
+// replaces the old.
+//   title:    plain text (safe for untrusted values)
+//   bodyHtml: markup, for static strings only
+//   actions:  [{ label, variant: "primary" | "secondary" | "flat",
+//                start: true to left-align, href to make it a link,
+//                title: hover text, onClick }]
+// Every action closes the flag after running its onClick.
+function showFlag({ title, bodyHtml, actions }) {
+  flagTitleEl.textContent = title;
+  flagBodyEl.innerHTML = bodyHtml;
+  flagActionsEl.replaceChildren(
+    ...actions.map(({ label, variant = "secondary", start = false, href, title: hint, onClick }) => {
+      const el = document.createElement(href ? "a" : "button");
+      el.className = `btn btn-${variant}${start ? " flag-action-start" : ""}`;
+      el.textContent = label;
+      if (hint) el.title = hint;
+      if (href) {
+        el.href = href;
+        el.target = "_blank";
+      } else {
+        el.type = "button";
+      }
+      el.addEventListener("click", () => {
+        hideFlag();
+        if (onClick) onClick();
+      });
+      return el;
+    })
+  );
+  flagEl.hidden = false;
+}
+
+function hideFlag() {
+  flagEl.hidden = true;
+}
+
+const GUIDE_URL = "https://github.com/markbenivegna/recap#system-audio-hearing-both-sides-of-a-call";
 
 // Shown when a recording starts without system audio (BlackHole missing or
 // not wired up), since that silently means the other side of a call is not
@@ -143,27 +184,23 @@ async function maybeShowAudioTip() {
     const cfg = await res.json();
     if (cfg.SYSTEM_AUDIO_TIP_IGNORED === "true") return;
     const seenBefore = cfg.SYSTEM_AUDIO_TIP_SEEN === "true";
-    audioTipIgnoreBtn.hidden = !seenBefore;
-    updateTipEl.hidden = true;
-    audioTipEl.hidden = false;
+    const actions = [{ label: "Dismiss" }];
+    if (seenBefore) {
+      actions.unshift({
+        label: "Ignore",
+        onClick: () => saveConfigFlags({ SYSTEM_AUDIO_TIP_IGNORED: "true" }),
+      });
+    }
+    showFlag({
+      title: "Only your mic is being recorded",
+      bodyHtml: `To also capture the other side of a call, install BlackHole (<code>brew install blackhole-2ch</code>), then in Audio MIDI Setup create a Multi-Output Device with your speakers and BlackHole 2ch. <a href="${GUIDE_URL}" target="_blank">Full guide</a>`,
+      actions,
+    });
     if (!seenBefore) saveConfigFlags({ SYSTEM_AUDIO_TIP_SEEN: "true" });
   } catch (err) {
     // The tip is a courtesy; never let it get in the way of recording.
   }
 }
-
-audioTipDismissBtn.addEventListener("click", () => {
-  audioTipEl.hidden = true;
-});
-audioTipIgnoreBtn.addEventListener("click", () => {
-  audioTipEl.hidden = true;
-  saveConfigFlags({ SYSTEM_AUDIO_TIP_IGNORED: "true" });
-});
-
-const updateTipEl = document.getElementById("updateTip");
-const updateTipTitleEl = document.getElementById("updateTipTitle");
-const updateTipDownloadLink = document.getElementById("updateTipDownloadLink");
-let pendingUpdateVersion = null;
 
 // Runs once at launch. Only ever a notice with a download link, not an
 // installer. Skipping a version stays quiet until an even newer one ships.
@@ -173,26 +210,27 @@ async function checkForUpdate(cfg) {
     const res = await fetch("/api/update-check");
     const info = await res.json();
     if (!info.update_available || info.latest === cfg.SKIPPED_UPDATE_VERSION) return;
-    pendingUpdateVersion = info.latest;
-    updateTipTitleEl.textContent = `Recap ${info.latest} is available (you have ${info.current})`;
-    updateTipDownloadLink.href = info.url;
-    // Don't stack on top of the recording tip.
-    updateTipEl.hidden = !audioTipEl.hidden;
+    // Never replace another flag that's already showing.
+    if (!flagEl.hidden) return;
+    showFlag({
+      title: `Recap ${info.latest} is available (you have ${info.current})`,
+      bodyHtml: "Download it from GitHub, then replace the app in your Applications folder.",
+      actions: [
+        {
+          label: "Skip",
+          variant: "flat",
+          start: true,
+          title: "Don't remind me about this version",
+          onClick: () => saveConfigFlags({ SKIPPED_UPDATE_VERSION: info.latest }),
+        },
+        { label: "Later" },
+        { label: "Download", variant: "primary", href: info.url },
+      ],
+    });
   } catch (err) {
     // A failed update check is never worth bothering anyone about.
   }
 }
-
-document.getElementById("updateTipLaterBtn").addEventListener("click", () => {
-  updateTipEl.hidden = true;
-});
-document.getElementById("updateTipSkipBtn").addEventListener("click", () => {
-  updateTipEl.hidden = true;
-  saveConfigFlags({ SKIPPED_UPDATE_VERSION: pendingUpdateVersion });
-});
-updateTipDownloadLink.addEventListener("click", () => {
-  updateTipEl.hidden = true;
-});
 
 let toastTimer = null;
 function showToast(message, isError = false) {

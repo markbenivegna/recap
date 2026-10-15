@@ -232,23 +232,10 @@
     <span id="toastText"></span>
   </div>
 
-  <div id="updateTip" class="audio-tip" role="status" hidden>
-    <div class="audio-tip-title" id="updateTipTitle">A new version of Recap is available</div>
-    <p class="audio-tip-body">Download it from GitHub, then replace the app in your Applications folder.</p>
-    <div class="audio-tip-actions">
-      <button type="button" id="updateTipSkipBtn" class="btn btn-flat" title="Don't remind me about this version">Skip</button>
-      <button type="button" id="updateTipLaterBtn" class="btn btn-secondary">Later</button>
-      <a id="updateTipDownloadLink" class="btn btn-primary" href="#" target="_blank">Download</a>
-    </div>
-  </div>
-
-  <div id="audioTip" class="audio-tip" role="status" hidden>
-    <div class="audio-tip-title">Only your mic is being recorded</div>
-    <p class="audio-tip-body">To also capture the other side of a call, install BlackHole (<code>brew install blackhole-2ch</code>), then in Audio MIDI Setup create a Multi-Output Device with your speakers and BlackHole 2ch. <a href="https://github.com/markbenivegna/recap#system-audio-hearing-both-sides-of-a-call" target="_blank">Full guide</a></p>
-    <div class="audio-tip-actions">
-      <button type="button" id="audioTipIgnoreBtn" class="btn btn-secondary" hidden>Ignore</button>
-      <button type="button" id="audioTipDismissBtn" class="btn btn-secondary">Dismiss</button>
-    </div>
+  <div id="flag" class="flag" role="status" hidden>
+    <div id="flagTitle" class="flag-title"></div>
+    <p id="flagBody" class="flag-body"></p>
+    <div id="flagActions" class="flag-actions"></div>
   </div>
 
   <div id="status" class="status" hidden>
