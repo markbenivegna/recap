@@ -1,4 +1,7 @@
+import json
 import os
+import re
+import traceback
 
 import anthropic
 
@@ -49,6 +52,11 @@ by name, signing off with a name), use that name in the summary and notes instea
 generic label. If a speaker's name never comes up, keep referring to them by their generic \
 label rather than guessing a name.
 
+Coverage: every distinct topic that was substantively discussed, meaning someone explained, \
+decided, or committed to something about it, needs a place in the notes. A long or dense meeting \
+is not a reason to leave a topic out. If something has to be shortened, shorten how much you say \
+about it, not whether it appears at all.
+{{LEVEL}}
 Respond with exactly this format, no preamble:
 
 TITLE:
@@ -62,6 +70,129 @@ NOTES:
 """
 
 
+DETAIL_LEVELS = ("quick", "balanced", "detailed")
+DEFAULT_DETAIL_LEVEL = "balanced"
+
+# "balanced" adds nothing: it is the prompt above exactly as it was before
+# detail levels existed, so choosing it changes no behavior.
+_LEVEL_INSTRUCTIONS = {
+    "quick": """
+Detail level: QUICK. The reader wants the gist in under a minute, so this level deliberately \
+overrides the coverage rule above. Write a one or two sentence summary. For the notes, write only \
+the Action Items section (skip it if there genuinely are none), plus at most a few short bullets \
+for decisions or deadlines that are not action items. Do not write topic sections.
+""",
+    "balanced": "",
+    "detailed": """
+Detail level: DETAILED. The reader wants the notes to stand in for the meeting. Keep the \
+supporting detail for each topic and not just the headline: the reasoning behind a decision, the \
+alternatives that were considered and why they lost, open questions, and who said what when it \
+matters. Names, numbers, dates and technical specifics stay exact. Longer notes are fine at this \
+level, but only for content that was really said.
+""",
+}
+
+# Output ceiling per level. Quick only needs a little; keeping it low stops
+# a runaway answer from costing more than the short result is worth.
+# Balanced and detailed keep the full 16000 that stopped long meetings from
+# being cut off mid-notes (see the note on max_tokens in summarize_transcript).
+_LEVEL_MAX_TOKENS = {"quick": 3000, "balanced": 16000, "detailed": 16000}
+
+
+def _detail_level():
+    # Read on every call, not once at import: Settings changes this in
+    # os.environ at any point after startup (same reason transcribe.py reads
+    # VOCABULARY_HINTS per call).
+    level = os.environ.get("SUMMARY_DETAIL_LEVEL", "").strip().lower()
+    return level if level in DETAIL_LEVELS else DEFAULT_DETAIL_LEVEL
+
+
+def _system_prompt(level):
+    return SYSTEM_PROMPT.replace("{{LEVEL}}", _LEVEL_INSTRUCTIONS[level])
+
+
+COVERAGE_PROMPT = """You audit meeting notes against the transcript they were written from.
+
+List the substantive topics in the transcript that the notes do NOT cover, or cover so thinly \
+that the key point is lost. Substantive means someone explained, decided, walked through, or \
+committed to something that a reader would want to find in the notes later: decisions, plans, \
+technical or product explanations, deadlines, numbers, names, open questions.
+
+Do not list small talk, greetings, scheduling logistics, or tangents with no real content. A \
+topic that appears in the notes in any form, even briefly, is covered; only list real gaps. Be \
+conservative: if you are unsure whether something is a gap, leave it out.
+
+Respond with only JSON, in this shape:
+{"missing": [{"topic": "<2 to 6 words>", "detail": "<one sentence: what was actually said, with the specifics that would otherwise be lost>"}]}
+
+Use {"missing": []} if nothing substantive is missing. List at most 6 items, most important first."""
+
+ADD_TOPICS_PROMPT = """You add missing topics to existing meeting notes.
+
+You are given a transcript, the notes as they currently stand, and a list of topics the notes \
+miss. Write only the new content. For each topic, write a section heading in the same style as \
+the existing notes (its own line wrapped in double asterisks, like **Topic Name**) followed by \
+prose paragraphs describing what was actually discussed and decided. Keep names, numbers, dates \
+and technical specifics exact, and refer to people the same way the existing notes do.
+
+Do not repeat anything already in the notes, and do not write an Action Items section: put any \
+commitments or deadlines in the prose instead. Respond with only the new sections, no preamble."""
+
+
+def _parse_missing_topics(raw):
+    """Pull the topic list out of the coverage check's reply. Best-effort on
+    purpose: a malformed reply means no warning, never a broken summary."""
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not match:
+        return []
+    try:
+        items = json.loads(match.group(0)).get("missing", [])
+    except (ValueError, AttributeError):
+        return []
+    topics = []
+    for item in items if isinstance(items, list) else []:
+        if isinstance(item, dict) and str(item.get("topic", "")).strip():
+            topics.append({"topic": str(item["topic"]).strip(), "detail": str(item.get("detail", "")).strip()})
+    return topics[:6]
+
+
+def find_missing_topics(transcript, notes):
+    """Second pass: check the finished notes against the transcript. A
+    summary can finish completely normally and still just leave a whole
+    topic out, with nothing to tell the reader anything is missing. This
+    is what gives that case a signal."""
+    client = _client()
+    message = client.messages.create(
+        model=MODEL,
+        max_tokens=1500,
+        system=COVERAGE_PROMPT,
+        messages=[{"role": "user", "content": f"Transcript:\n\n{transcript}\n\n---\n\nNotes:\n\n{notes}"}],
+    )
+    record_usage(MODEL, message.usage.input_tokens, message.usage.output_tokens)
+    raw = "".join(block.text for block in message.content if block.type == "text")
+    return _parse_missing_topics(raw)
+
+
+def add_missing_topics(transcript, notes, topics):
+    """Write sections for just the topics the coverage check found missing,
+    to be appended to the existing notes."""
+    client = _client()
+    listed = "\n".join(f"- {t['topic']}: {t.get('detail', '')}" for t in topics)
+    message = client.messages.create(
+        model=MODEL,
+        max_tokens=4000,
+        system=ADD_TOPICS_PROMPT,
+        messages=[
+            {
+                "role": "user",
+                "content": f"Transcript:\n\n{transcript}\n\n---\n\nCurrent notes:\n\n{notes}\n\n---\n\nMissing topics:\n{listed}",
+            }
+        ],
+    )
+    record_usage(MODEL, message.usage.input_tokens, message.usage.output_tokens)
+    return "".join(block.text for block in message.content if block.type == "text").strip()
+
+
 def _client():
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -73,6 +204,7 @@ def summarize_transcript(transcript_text):
     if not transcript_text or not transcript_text.strip():
         raise ValueError("Transcript is empty")
 
+    level = _detail_level()
     client = _client()
     message = client.messages.create(
         model=MODEL,
@@ -84,8 +216,8 @@ def summarize_transcript(transcript_text):
         # is comfortably more than even a long meeting's summary+notes
         # should ever need, without restructuring this into a streaming
         # call.
-        max_tokens=16000,
-        system=SYSTEM_PROMPT,
+        max_tokens=_LEVEL_MAX_TOKENS[level],
+        system=_system_prompt(level),
         messages=[{"role": "user", "content": f"Transcript:\n\n{transcript_text}"}],
     )
 
@@ -99,6 +231,17 @@ def summarize_transcript(transcript_text):
     # is already sized to avoid, not a replacement for that fix.
     if message.stop_reason == "max_tokens":
         result["truncated"] = True
+
+    # Quick notes leave topics out on purpose, so checking them for gaps
+    # would only flag the point of the setting.
+    result["missing_topics"] = []
+    if level != "quick" and result["notes"]:
+        try:
+            result["missing_topics"] = find_missing_topics(transcript_text, result["notes"])
+        except Exception:
+            # The notes are already good enough to show. A failed audit
+            # means no warning this time, not a failed summary.
+            traceback.print_exc()
     return result
 
 

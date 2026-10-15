@@ -20,6 +20,12 @@ const speakerEditText = document.getElementById("speakerEditText");
 const speakerUndoBtn = document.getElementById("speakerUndoBtn");
 const regenerateNotesBtn = document.getElementById("regenerateNotesBtn");
 const speakerMenu = document.getElementById("speakerMenu");
+const coverageBar = document.getElementById("coverageBar");
+const coverageList = document.getElementById("coverageList");
+const coverageAddBtn = document.getElementById("coverageAddBtn");
+const coverageDismissBtn = document.getElementById("coverageDismissBtn");
+const cfgSummaryDetail = document.getElementById("cfgSummaryDetail");
+const cfgSummaryDetailValue = document.getElementById("cfgSummaryDetailValue");
 const meetingTitleEl = document.getElementById("meetingTitle");
 const summaryContent = document.getElementById("summaryContent");
 const notesContent = document.getElementById("notesContent");
@@ -528,6 +534,7 @@ function resetToNewRecording() {
   speakerMergeHistory = [];
   renderSpeakerEditBar();
   closeSpeakerMenu();
+  hideCoverageBar();
   lastFailedAudioArgs = null;
   resultsEl.hidden = true;
   transcribeErrorEl.hidden = true;
@@ -806,10 +813,70 @@ regenerateNotesBtn.addEventListener("click", async () => {
   }
 });
 
+// --- Notes coverage warning ---------------------------------------------
+// A summary can finish normally and still leave a whole topic out. The
+// backend audits the finished notes against the transcript and returns what
+// looks missing; this shows it, and lets the user add just those topics.
+const SUMMARY_DETAIL_LEVELS = ["quick", "balanced", "detailed"];
+const SUMMARY_DETAIL_LABELS = ["Quick", "Balanced", "Detailed"];
+let coverageTopics = [];
+
+function showCoverageBar(topics) {
+  coverageTopics = topics;
+  coverageList.innerHTML = "";
+  topics.forEach((t) => {
+    const li = document.createElement("li");
+    const name = document.createElement("strong");
+    name.textContent = t.topic;
+    li.appendChild(name);
+    if (t.detail) li.appendChild(document.createTextNode(`: ${t.detail}`));
+    coverageList.appendChild(li);
+  });
+  coverageBar.hidden = topics.length === 0;
+  coverageAddBtn.disabled = false;
+  coverageDismissBtn.disabled = false;
+}
+
+function hideCoverageBar() {
+  coverageTopics = [];
+  coverageBar.hidden = true;
+}
+
+coverageDismissBtn.addEventListener("click", hideCoverageBar);
+
+coverageAddBtn.addEventListener("click", async () => {
+  if (!lastResult || !coverageTopics.length) return;
+  coverageAddBtn.disabled = true;
+  coverageDismissBtn.disabled = true;
+  setStatus("Adding the missing topics to the notes...", false, true);
+  try {
+    const res = await fetch("/api/summarize/add-topics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript: lastResult.text, notes: lastResult.notes, topics: coverageTopics }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Couldn't add topics");
+
+    const count = coverageTopics.length;
+    lastResult.notes = `${lastResult.notes}\n\n${data.addendum}`;
+    notesContent.textContent = lastResult.notes;
+    hideCoverageBar();
+    setStatus("");
+    switchTab("notes");
+    showToast(`Added ${count} ${count === 1 ? "topic" : "topics"} to the notes`);
+  } catch (err) {
+    setStatus(`Couldn't add the topics: ${err.message}`, true);
+    coverageAddBtn.disabled = false;
+    coverageDismissBtn.disabled = false;
+  }
+});
+
 // `regenerating` is for redoing the notes on an already-shown result (after
 // merging speakers): the existing summary and notes stay on screen until the
 // new ones arrive, and a failure leaves them alone instead of clearing them.
 async function generateSummary(transcriptText, { regenerating = false } = {}) {
+  hideCoverageBar();
   const skeletonTimer = setTimeout(() => {
     if (regenerating) return;
     renderSkeleton(summaryContent);
@@ -828,6 +895,7 @@ async function generateSummary(transcriptText, { regenerating = false } = {}) {
     lastResult.title = data.title;
     lastResult.summary = data.summary;
     lastResult.notes = data.notes;
+    showCoverageBar(data.missing_topics || []);
     summaryContent.textContent = data.summary;
     notesContent.textContent = data.notes;
     if (data.title) {
@@ -1014,6 +1082,9 @@ async function openSettings({ isFirstRun = false } = {}) {
     cfgSpendThreshold.value = data.SPEND_ALERT_THRESHOLD || "";
     cfgDiarizationThreshold.value = data.DIARIZATION_THRESHOLD || "0.7";
     cfgDiarizationThresholdValue.textContent = Number(cfgDiarizationThreshold.value).toFixed(2);
+    const detailIndex = SUMMARY_DETAIL_LEVELS.indexOf(data.SUMMARY_DETAIL_LEVEL);
+    cfgSummaryDetail.value = String(detailIndex === -1 ? 1 : detailIndex);
+    cfgSummaryDetailValue.textContent = SUMMARY_DETAIL_LABELS[cfgSummaryDetail.value];
     cfgShowMenuBarIcon.checked = data.SHOW_MENU_BAR_ICON !== "false";
     cfgDetectMeetings.checked = data.DETECT_MEETINGS !== "false";
     loadUsageDisplay();
@@ -1049,6 +1120,7 @@ async function saveSettings() {
         RECORDING_OUTPUT_DEVICE: cfgOutputDevice.value.trim(),
         SPEND_ALERT_THRESHOLD: cfgSpendThreshold.value.trim(),
         DIARIZATION_THRESHOLD: cfgDiarizationThreshold.value,
+        SUMMARY_DETAIL_LEVEL: SUMMARY_DETAIL_LEVELS[Number(cfgSummaryDetail.value)],
         SHOW_MENU_BAR_ICON: String(cfgShowMenuBarIcon.checked),
         DETECT_MEETINGS: String(cfgDetectMeetings.checked),
       }),
@@ -1072,6 +1144,7 @@ async function saveSettings() {
   cfgOutputDevice,
   cfgSpendThreshold,
   cfgDiarizationThreshold,
+  cfgSummaryDetail,
   cfgShowMenuBarIcon,
   cfgDetectMeetings,
 ].forEach((el) => {
@@ -1083,6 +1156,9 @@ async function saveSettings() {
 // thumb in real time.
 cfgDiarizationThreshold.addEventListener("input", () => {
   cfgDiarizationThresholdValue.textContent = Number(cfgDiarizationThreshold.value).toFixed(2);
+});
+cfgSummaryDetail.addEventListener("input", () => {
+  cfgSummaryDetailValue.textContent = SUMMARY_DETAIL_LABELS[cfgSummaryDetail.value];
 });
 
 // First-run: if the essential keys aren't set yet, open Settings

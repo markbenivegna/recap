@@ -611,6 +611,32 @@ h1 {
   outline-offset: 2px;
 }
 
+/* The notes-coverage warning. Sits above the tab panels, not inside one, so
+   it is seen on whichever tab is open. */
+.coverage-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #f5a524 12%, var(--panel));
+  box-shadow: 0 0 0 1px color-mix(in srgb, #f5a524 45%, var(--border));
+}
+.coverage-bar[hidden] { display: none; }
+.coverage-main { flex: 1; min-width: 0; }
+.coverage-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  max-height: 96px;
+  overflow-y: auto;
+  color: var(--muted);
+}
+.coverage-list strong { color: var(--text); font-weight: 600; }
+.coverage-actions { flex-shrink: 0; display: flex; gap: 8px; }
+
 .btn-small {
   padding: 6px 10px;
   font-size: 13px;
@@ -1115,9 +1141,10 @@ h1 {
   accent-color: var(--accent);
 }
 
+/* Wide enough for "Balanced" so every slider's track ends at the same place. */
 .slider-value {
   flex-shrink: 0;
-  width: 36px;
+  width: 72px;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   color: var(--muted);

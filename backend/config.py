@@ -9,6 +9,7 @@ CONFIG_FIELDS = [
     ("WHISPER_MODEL_SIZE", False),
     ("VOCABULARY_HINTS", False),
     ("DIARIZATION_THRESHOLD", False),
+    ("SUMMARY_DETAIL_LEVEL", False),
     ("RECORDING_OUTPUT_DEVICE", False),
     ("SPEND_ALERT_THRESHOLD", False),
     ("SHOW_MENU_BAR_ICON", False),

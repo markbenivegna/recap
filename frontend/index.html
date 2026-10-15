@@ -124,6 +124,30 @@
                 </div>
               </label>
               <label class="field">
+                <span>Notes detail</span>
+                <small>
+                  Quick is a one or two sentence summary and action items only. Balanced is topic-by-topic
+                  notes. Detailed adds the reasoning and alternatives behind each point. Applies to your next summary.
+                </small>
+                <div class="slider-field">
+                  <input
+                    type="range"
+                    id="cfgSummaryDetail"
+                    min="0"
+                    max="2"
+                    step="1"
+                    value="1"
+                    list="summaryDetailTicks"
+                  />
+                  <datalist id="summaryDetailTicks">
+                    <option value="0"></option>
+                    <option value="1"></option>
+                    <option value="2"></option>
+                  </datalist>
+                  <span id="cfgSummaryDetailValue" class="slider-value">Balanced</span>
+                </div>
+              </label>
+              <label class="field">
                 <span>Whisper model size</span>
                 <small>Applies next time you restart Recap.</small>
                 <select id="cfgWhisperSize">
@@ -249,6 +273,17 @@
         <button class="tab-btn" data-tab="notes">Notes</button>
         <button class="tab-btn" data-tab="transcript">Transcript</button>
       </nav>
+
+      <div id="coverageBar" class="coverage-bar" role="status" hidden>
+        <div class="coverage-main">
+          <strong>These notes may be missing:</strong>
+          <ul id="coverageList" class="coverage-list"></ul>
+        </div>
+        <div class="coverage-actions">
+          <button id="coverageAddBtn" class="btn btn-primary btn-small" type="button">Add to notes</button>
+          <button id="coverageDismissBtn" class="btn btn-small" type="button">Dismiss</button>
+        </div>
+      </div>
 
       <section id="tab-summary" class="tab-panel active">
         <div id="summaryContent" class="panel-content"></div>

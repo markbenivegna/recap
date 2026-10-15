@@ -12,7 +12,7 @@ load_dotenv(ENV_PATH)
 
 from backend import audio_switch, config as app_config, markdown_export, notion_client, usage_tracker
 from backend.diarize import diarize_segments, diarize_with_source_separation, format_transcript_with_speakers
-from backend.summarize import summarize_transcript
+from backend.summarize import add_missing_topics, summarize_transcript
 from backend.transcribe import transcribe_audio
 
 RECORDING_OUTPUT_DEVICE = os.environ.get("RECORDING_OUTPUT_DEVICE", "")
@@ -129,6 +129,22 @@ def api_summarize():
         except Exception:
             pass
         return jsonify(result)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/summarize/add-topics", methods=["POST"])
+def api_summarize_add_topics():
+    data = request.get_json(silent=True) or {}
+    transcript = data.get("transcript", "")
+    notes = data.get("notes", "")
+    topics = data.get("topics") or []
+
+    if not transcript.strip() or not topics:
+        return jsonify({"error": "transcript and topics are required"}), 400
+
+    try:
+        return jsonify({"addendum": add_missing_topics(transcript, notes, topics)})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
