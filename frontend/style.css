@@ -227,6 +227,14 @@ h1 {
   background: #c02719;
 }
 
+/* .btn-icon sets display:inline-flex, which beats the browser's
+   [hidden]{display:none} on specificity. */
+.btn-mute[hidden] { display: none; }
+
+.btn-mute .icon-mic-off { display: none; }
+.btn-mute[aria-pressed="true"] .icon-mic { display: none; }
+.btn-mute[aria-pressed="true"] .icon-mic-off { display: block; }
+
 /* Pressed = mic is muted. Needs its own :hover rule at the same specificity
    as the generic .btn:hover:not(:disabled), or hovering a muted button
    would flash back to the neutral hover fill. */

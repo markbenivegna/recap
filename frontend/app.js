@@ -332,7 +332,9 @@ function setMicMuted(muted) {
   // time-aligned. Pausing the recorders instead would drop that span from
   // each file and shift every later timestamp.
   if (liveMicStream) liveMicStream.getAudioTracks().forEach((t) => (t.enabled = !muted));
-  muteBtn.textContent = muted ? "Unmute mic" : "Mute mic";
+  const label = muted ? "Unmute mic" : "Mute mic";
+  muteBtn.title = label;
+  muteBtn.setAttribute("aria-label", label);
   muteBtn.setAttribute("aria-pressed", String(muted));
   recordingDotEl.classList.toggle("muted", muted);
   recordingAnimationTextEl.textContent = recordingSubtext();
@@ -342,7 +344,8 @@ function resetMicMute() {
   micMuted = false;
   liveMicStream = null;
   muteBtn.hidden = true;
-  muteBtn.textContent = "Mute mic";
+  muteBtn.title = "Mute mic";
+  muteBtn.setAttribute("aria-label", "Mute mic");
   muteBtn.setAttribute("aria-pressed", "false");
   recordingDotEl.classList.remove("muted");
 }
