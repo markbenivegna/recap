@@ -68,6 +68,25 @@ MIN_EMBED_RMS = 0.02
 # evidence this caught.
 LEAK_MIN_SYSTEM_RMS = 0.01
 
+# Leaked audio (another person's voice played through the user's speakers,
+# picked up again by their own mic) never matches that person's clean
+# system-track voiceprint as tightly as a clean clip would: the room adds
+# reverb and noise. Real evidence: clips confirmed to be someone else's
+# speech sat 0.71-0.77 from the nearest system voice, just above
+# CLUSTER_THRESHOLD, while sitting 0.82-1.02 from the user's own voice.
+# Real user speech with the other person audible underneath measured
+# 0.11-0.51 from the user's own voice. So a clip that does NOT match the
+# user's voice at CLUSTER_THRESHOLD, and is nearer some system voice than
+# the user's, is leak even when its best system match is looser than
+# CLUSTER_THRESHOLD - up to this ceiling, past which "nearest system voice"
+# stops meaning much (e.g. an in-person guest who isn't on the call at all).
+LEAK_MAX_SYSTEM_DISTANCE = 0.85
+
+# How close (in seconds) a mic-side neighbor has to be for a segment too
+# short to embed to inherit that neighbor's speaker label. See the mic-side
+# fallback in diarize_with_source_separation.
+MAX_INHERIT_GAP_SECONDS = 2.0
+
 # ECAPA-TDNN (the embedding model below) needs a real run of speech to
 # produce a stable voiceprint — anything much shorter than ~1 second gives a
 # noisy embedding that doesn't reliably represent the actual speaker. With
@@ -573,11 +592,21 @@ def diarize_with_source_separation(mic_path, system_path, segments):
             continue
         best_label = min(system_centroids, key=lambda label: _cosine_distance(emb, system_centroids[label]))
         best_dist = _cosine_distance(emb, system_centroids[best_label])
-        closer_to_you = (
-            provisional_you_centroid is not None
-            and _cosine_distance(emb, provisional_you_centroid) <= best_dist
+        you_dist = (
+            _cosine_distance(emb, provisional_you_centroid) if provisional_you_centroid is not None else None
         )
-        if best_dist < CLUSTER_THRESHOLD and not closer_to_you:
+        closer_to_you = you_dist is not None and you_dist <= best_dist
+        # The second path is for leak that's too degraded to land inside
+        # CLUSTER_THRESHOLD of the clean system voiceprint - see
+        # LEAK_MAX_SYSTEM_DISTANCE. It needs a real user voiceprint to
+        # compare against, so it never fires without one.
+        not_you_and_nearer_system = (
+            you_dist is not None
+            and you_dist >= CLUSTER_THRESHOLD
+            and best_dist < you_dist
+            and best_dist < LEAK_MAX_SYSTEM_DISTANCE
+        )
+        if (best_dist < CLUSTER_THRESHOLD and not closer_to_you) or not_you_and_nearer_system:
             reclassified[i] = best_label
         else:
             true_mic_indices.append(i)
@@ -594,6 +623,31 @@ def diarize_with_source_separation(mic_path, system_path, segments):
         for label in mic_labels.values():
             counts[label] = counts.get(label, 0) + 1
         you_cluster = max(counts, key=counts.get)
+
+        # A mic segment too short or quiet to embed (see _embed_clip) has no
+        # voice evidence of its own, and _embed_and_cluster gave it whatever
+        # label the previous mic-side segment had, however long ago that
+        # was. That's only a sound guess when the neighbor is actually
+        # close: a one-word reply sitting right beside the same person's
+        # longer turn. Real evidence both ways: once the leak rule removed
+        # three false "You" clips, four short replies (including a "Sure"
+        # answering "you want to go next?") whose only nearby mic neighbor
+        # had been one of those clips inherited a label from a stray cluster
+        # many seconds away, and moved off You. But a blanket "default to
+        # You" is wrong too: in a meeting where the other person is partly
+        # picked up on the mic, 44 of their short segments sit within a
+        # fraction of a second of their own longer turns, and inheriting was
+        # right. So inherit only from a close neighbor; with none, fall back
+        # to the mic channel's strong prior (almost always the user).
+        previous = None
+        for i in true_mic_indices:
+            seg = segments[i]
+            if _embed_clip(mic_audio, mic_sr, seg["start"], seg["end"], min_rms=MIN_EMBED_RMS) is None:
+                has_close_neighbor = (
+                    previous is not None and seg["start"] - segments[previous]["end"] <= MAX_INHERIT_GAP_SECONDS
+                )
+                mic_labels[i] = mic_labels[previous] if has_close_neighbor else you_cluster
+            previous = i
 
         # _embed_and_cluster's own consolidation pass requires the smaller
         # cluster to look like a minority fragment (see _is_fragment) —
