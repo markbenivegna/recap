@@ -184,6 +184,26 @@ def api_update_check():
     return jsonify(updates.check_for_update())
 
 
+@app.route("/api/window/backdrop", methods=["POST"])
+def api_window_backdrop():
+    data = request.get_json(silent=True) or {}
+    rgb = data.get("rgb")
+    if rgb is not None and not (
+        isinstance(rgb, list) and len(rgb) == 3 and all(isinstance(c, int) and 0 <= c <= 255 for c in rgb)
+    ):
+        return jsonify({"error": "rgb must be three integers 0-255 or null"}), 400
+    try:
+        # Same main-thread rule as /api/settings above.
+        from PyObjCTools import AppHelper
+
+        from backend import appearance
+
+        AppHelper.callAfter(appearance.set_backdrop, rgb)
+    except Exception:
+        pass
+    return jsonify({"ok": True})
+
+
 @app.route("/api/usage", methods=["GET"])
 def api_usage_get():
     data = usage_tracker.get_usage()

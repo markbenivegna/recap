@@ -1,6 +1,18 @@
 from backend.config import read_config
 
 _window = None
+# While a modal overlay is open, the page dims itself but the native titlebar
+# strip above the web view can't be reached by page CSS, so it would stay
+# bright. The page tells us the exact dimmed color and we paint the strip to
+# match; None means no overlay, back to plain black/white.
+_backdrop = None
+
+
+def set_backdrop(rgb):
+    global _backdrop
+    _backdrop = tuple(rgb) if rgb else None
+    if _window is not None:
+        sync_titlebar_color(_window)
 
 
 def sync_titlebar_color(window):
@@ -19,7 +31,11 @@ def sync_titlebar_color(window):
             [NSAppearanceNameAqua, NSAppearanceNameDarkAqua]
         )
         is_dark = best_match == NSAppearanceNameDarkAqua
-        native.setBackgroundColor_(NSColor.blackColor() if is_dark else NSColor.whiteColor())
+        if _backdrop:
+            r, g, b = (channel / 255 for channel in _backdrop)
+            native.setBackgroundColor_(NSColor.colorWithSRGBRed_green_blue_alpha_(r, g, b, 1.0))
+        else:
+            native.setBackgroundColor_(NSColor.blackColor() if is_dark else NSColor.whiteColor())
     except Exception:
         pass
 

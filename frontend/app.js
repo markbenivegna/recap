@@ -239,6 +239,28 @@ async function checkForUpdate(cfg) {
   }
 }
 
+// The native titlebar strip sits outside the web view, so page CSS can't dim
+// it. While a modal overlay is open, tell the backend the exact dimmed color
+// (page background blended with the overlay) so it can paint the strip to
+// match. Fails silently outside the packaged app.
+function syncWindowBackdrop() {
+  const open = [...document.querySelectorAll(".modal-overlay")].some((el) => !el.hidden);
+  let rgb = null;
+  if (open) {
+    const parse = (value) => (value.match(/[\d.]+/g) || []).map(Number);
+    const [br, bg, bb] = parse(getComputedStyle(document.body).backgroundColor);
+    const [or, og, ob, oa = 1] = parse(getComputedStyle(document.querySelector(".modal-overlay")).backgroundColor);
+    rgb = [[br, or], [bg, og], [bb, ob]].map(([base, over]) => Math.round(base * (1 - oa) + over * oa));
+  }
+  fetch("/api/window/backdrop", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rgb }),
+  }).catch(() => {});
+}
+const backdropObserver = new MutationObserver(syncWindowBackdrop);
+document.querySelectorAll(".modal-overlay").forEach((el) => backdropObserver.observe(el, { attributes: true, attributeFilter: ["hidden"] }));
+
 let toastTimer = null;
 function showToast(message, isError = false) {
   toastTextEl.textContent = message;
