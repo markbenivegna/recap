@@ -1425,6 +1425,14 @@ h1 {
   white-space: nowrap;
 }
 
+/* Flat: no ring or fill at rest, for the low-emphasis option next to
+   real buttons. */
+.btn-flat {
+  box-shadow: none;
+  background: transparent;
+  color: var(--muted);
+}
+
 .audio-tip-actions a.btn {
   text-decoration: none;
 }
