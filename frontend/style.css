@@ -1437,11 +1437,11 @@ h1 {
   text-decoration: none;
 }
 
-/* Left-aligned action: pulled out by the button's own padding so its text
-   lines up with the title above, while the hover fill still has room. */
+/* Left-aligned action: the button's box (and so its hover fill) starts at
+   the same edge as the title, mirroring how the right-hand buttons end at
+   the right edge. */
 .flag-actions .flag-action-start {
   margin-right: auto;
-  margin-left: -14px;
 }
 
 .flag-actions {
