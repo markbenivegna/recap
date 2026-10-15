@@ -163,7 +163,7 @@
               </label>
               <label class="field">
                 <span>Recording output device</span>
-                <small>Exact Multi-Output Device name for system-audio auto-switching (optional). See README.</small>
+                <small>To capture the other side of calls, install BlackHole (<code>brew install blackhole-2ch</code>), then in Audio MIDI Setup create a Multi-Output Device with your speakers and BlackHole 2ch. Enter its exact name here and Recap switches to it only while recording (optional). <a href="https://github.com/markbenivegna/recap#system-audio-hearing-both-sides-of-a-call" target="_blank">Full guide</a></small>
                 <input type="text" id="cfgOutputDevice" />
               </label>
             </section>
@@ -223,6 +223,15 @@
 
   <div id="toast" class="toast" hidden>
     <span id="toastText"></span>
+  </div>
+
+  <div id="audioTip" class="audio-tip" role="status" hidden>
+    <div class="audio-tip-title">Only your mic is being recorded</div>
+    <p class="audio-tip-body">To also capture the other side of a call, install BlackHole (<code>brew install blackhole-2ch</code>), then in Audio MIDI Setup create a Multi-Output Device with your speakers and BlackHole 2ch. <a href="https://github.com/markbenivegna/recap#system-audio-hearing-both-sides-of-a-call" target="_blank">Full guide</a></p>
+    <div class="audio-tip-actions">
+      <button type="button" id="audioTipIgnoreBtn" class="btn btn-secondary" hidden>Ignore</button>
+      <button type="button" id="audioTipDismissBtn" class="btn btn-secondary">Dismiss</button>
+    </div>
   </div>
 
   <div id="status" class="status" hidden>

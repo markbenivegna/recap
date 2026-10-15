@@ -119,6 +119,45 @@ function setStatus(message, isError = false, showSpinner = false) {
   statusSpinnerEl.hidden = !showSpinner;
 }
 
+const audioTipEl = document.getElementById("audioTip");
+const audioTipIgnoreBtn = document.getElementById("audioTipIgnoreBtn");
+const audioTipDismissBtn = document.getElementById("audioTipDismissBtn");
+
+function saveConfigFlags(flags) {
+  return fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(flags),
+  }).catch(() => {});
+}
+
+// Shown when a recording starts without system audio (BlackHole missing or
+// not wired up), since that silently means the other side of a call is not
+// captured. The first time it only offers Dismiss; after that it also
+// offers Ignore, which stops it for good. Anyone who has system audio
+// working never sees it.
+async function maybeShowAudioTip() {
+  try {
+    const res = await fetch("/api/settings");
+    const cfg = await res.json();
+    if (cfg.SYSTEM_AUDIO_TIP_IGNORED === "true") return;
+    const seenBefore = cfg.SYSTEM_AUDIO_TIP_SEEN === "true";
+    audioTipIgnoreBtn.hidden = !seenBefore;
+    audioTipEl.hidden = false;
+    if (!seenBefore) saveConfigFlags({ SYSTEM_AUDIO_TIP_SEEN: "true" });
+  } catch (err) {
+    // The tip is a courtesy; never let it get in the way of recording.
+  }
+}
+
+audioTipDismissBtn.addEventListener("click", () => {
+  audioTipEl.hidden = true;
+});
+audioTipIgnoreBtn.addEventListener("click", () => {
+  audioTipEl.hidden = true;
+  saveConfigFlags({ SYSTEM_AUDIO_TIP_IGNORED: "true" });
+});
+
 let toastTimer = null;
 function showToast(message, isError = false) {
   toastTextEl.textContent = message;
@@ -471,6 +510,7 @@ async function startRecording() {
     playRecordingAnimation(recordingSubtext());
     muteBtn.hidden = false;
     setMicMuted(false);
+    if (!usingSystemAudio) maybeShowAudioTip();
     recordingStart = Date.now();
     recordBtn.textContent = "Stop";
     recordBtn.classList.add("recording");

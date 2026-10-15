@@ -1384,6 +1384,49 @@ h1 {
   animation: toast-in 150ms ease-out;
 }
 
+.audio-tip {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 190;
+  width: min(440px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--border), var(--shadow-lg);
+  font-size: 13px;
+  animation: toast-in 150ms ease-out;
+}
+
+.audio-tip[hidden],
+.audio-tip .btn[hidden] {
+  display: none;
+}
+
+.audio-tip-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.audio-tip-body {
+  margin: 0 0 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.audio-tip-body a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.audio-tip-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .toast[hidden] {
   display: none;
 }
