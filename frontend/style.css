@@ -1498,7 +1498,10 @@ h1 {
   cursor: pointer;
 }
 
-.segmented label span {
+.field .segmented label span {
+  /* .field span adds a bottom margin meant for field titles; cancel it so
+     the pill fills the container with no gap underneath. */
+  margin-bottom: 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1511,14 +1514,14 @@ h1 {
   transition: background-color 100ms linear, color 100ms linear, box-shadow 100ms linear;
 }
 
-.segmented label:hover span,
-.segmented input:checked + span {
+.field .segmented label:hover span,
+.field .segmented input:checked + span {
   background: var(--panel);
   color: var(--tab-active-text);
   box-shadow: inset 0 0 0 1px var(--tab-active-border), var(--shadow-xs);
 }
 
-.segmented input:focus-visible + span {
+.field .segmented input:focus-visible + span {
   outline: 2px solid var(--accent-hover);
   outline-offset: 2px;
 }
