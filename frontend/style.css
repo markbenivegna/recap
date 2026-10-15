@@ -1499,7 +1499,9 @@ h1 {
 }
 
 .segmented label span {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 14px;
   border-radius: 8px;
   font-size: 14px;
