@@ -77,15 +77,15 @@
           </p>
           <form id="settingsForm">
             <section class="settings-panel active" data-category="general">
-              <label class="field">
-                <span>Appearance</span>
+              <div class="field" role="radiogroup" aria-labelledby="appearanceLabel">
+                <span id="appearanceLabel">Appearance</span>
                 <small>System follows your Mac's light or dark setting.</small>
-                <select id="cfgAppearance">
-                  <option value="system">System</option>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
-              </label>
+                <div class="segmented">
+                  <label><input type="radio" name="cfgAppearance" value="system" /><span>System</span></label>
+                  <label><input type="radio" name="cfgAppearance" value="light" /><span>Light</span></label>
+                  <label><input type="radio" name="cfgAppearance" value="dark" /><span>Dark</span></label>
+                </div>
+              </div>
               <label class="field field-toggle">
                 <div class="field-toggle-text">
                   <span>Menu bar icon</span>
