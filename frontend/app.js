@@ -75,6 +75,7 @@ const cfgDiarizationThresholdValue = document.getElementById("cfgDiarizationThre
 const cfgShowMenuBarIcon = document.getElementById("cfgShowMenuBarIcon");
 const cfgDetectMeetings = document.getElementById("cfgDetectMeetings");
 const cfgCheckUpdates = document.getElementById("cfgCheckUpdates");
+const cfgAppearance = document.getElementById("cfgAppearance");
 const usageValueText = document.getElementById("usageValueText");
 const usagePill = document.getElementById("usagePill");
 const usageRingFill = document.getElementById("usageRingFill");
@@ -1202,6 +1203,7 @@ async function openSettings({ isFirstRun = false } = {}) {
     cfgShowMenuBarIcon.checked = data.SHOW_MENU_BAR_ICON !== "false";
     cfgDetectMeetings.checked = data.DETECT_MEETINGS !== "false";
     cfgCheckUpdates.checked = data.CHECK_FOR_UPDATES !== "false";
+    cfgAppearance.value = ["light", "dark"].includes(data.APPEARANCE) ? data.APPEARANCE : "system";
     loadUsageDisplay();
   } catch (err) {
     showToast(`Could not load current settings: ${err.message}`, true);
@@ -1239,6 +1241,7 @@ async function saveSettings() {
         SHOW_MENU_BAR_ICON: String(cfgShowMenuBarIcon.checked),
         DETECT_MEETINGS: String(cfgDetectMeetings.checked),
         CHECK_FOR_UPDATES: String(cfgCheckUpdates.checked),
+        APPEARANCE: cfgAppearance.value === "system" ? "" : cfgAppearance.value,
       }),
     });
     const data = await res.json();
@@ -1264,6 +1267,7 @@ async function saveSettings() {
   cfgShowMenuBarIcon,
   cfgDetectMeetings,
   cfgCheckUpdates,
+  cfgAppearance,
 ].forEach((el) => {
   el.addEventListener("change", saveSettings);
 });

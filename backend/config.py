@@ -16,6 +16,7 @@ CONFIG_FIELDS = [
     ("SPEND_ALERT_THRESHOLD", False),
     ("SHOW_MENU_BAR_ICON", False),
     ("DETECT_MEETINGS", False),
+    ("APPEARANCE", False),
     ("CHECK_FOR_UPDATES", False),
     ("SKIPPED_UPDATE_VERSION", False),
 ]

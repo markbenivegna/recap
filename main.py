@@ -74,7 +74,7 @@ import threading  # noqa: E402
 
 import webview  # noqa: E402
 
-from backend import meeting_detector, menubar, window_state  # noqa: E402
+from backend import appearance, meeting_detector, menubar, window_state  # noqa: E402
 from backend.app import app  # noqa: E402
 
 HOST = "127.0.0.1"
@@ -336,27 +336,6 @@ def run_flask(port):
     app.run(host=HOST, port=port, debug=False, use_reloader=False, threaded=True)
 
 
-def sync_titlebar_color(window):
-    # Match the native window's background exactly to our page background
-    # (plain black/white, not windowBackgroundColor() — that's a
-    # slightly-off system gray in each mode, not a true match, so a seam
-    # reappears in a different shade if used here). Re-run any time the
-    # appearance actually changes, not just once at launch — macOS's
-    # "Automatic" appearance setting switches light/dark on its own
-    # schedule while the app may already be running.
-    try:
-        from AppKit import NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSColor
-
-        native = window.native
-        best_match = native.effectiveAppearance().bestMatchFromAppearancesWithNames_(
-            [NSAppearanceNameAqua, NSAppearanceNameDarkAqua]
-        )
-        is_dark = best_match == NSAppearanceNameDarkAqua
-        native.setBackgroundColor_(NSColor.blackColor() if is_dark else NSColor.whiteColor())
-    except Exception:
-        pass
-
-
 def hide_titlebar_text(window):
     # Keep the native close/minimize/zoom buttons but remove the title
     # string and the visually distinct bar behind them, so the window
@@ -383,7 +362,7 @@ def hide_titlebar_text(window):
     except Exception:
         pass
 
-    sync_titlebar_color(window)
+    appearance.sync_titlebar_color(window)
 
 
 def watch_appearance_changes(window):
@@ -395,7 +374,7 @@ def watch_appearance_changes(window):
         from PyObjCTools import AppHelper
 
         def on_change(_notification):
-            AppHelper.callAfter(sync_titlebar_color, window)
+            AppHelper.callAfter(appearance.sync_titlebar_color, window)
 
         NSDistributedNotificationCenter.defaultCenter().addObserverForName_object_queue_usingBlock_(
             "AppleInterfaceThemeChangedNotification", None, NSOperationQueue.mainQueue(), on_change
@@ -463,6 +442,7 @@ if __name__ == "__main__":
 
         AppHelper.callAfter(hide_titlebar_text, window)
         AppHelper.callAfter(watch_appearance_changes, window)
+        AppHelper.callAfter(appearance.sync, window)
         AppHelper.callAfter(menubar.sync, window)
         AppHelper.callAfter(meeting_detector.sync, window)
         AppHelper.callAfter(patch_about_panel)
