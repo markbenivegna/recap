@@ -67,6 +67,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # What changed comes from release-notes/<tag>.md, written before
+          # tagging. The install steps are the same every time, so they are
+          # appended here. With no notes file, GitHub's generated notes are
+          # used instead of leaving the page empty of changes.
+          NOTES_FILE="release-notes/${{ github.ref_name }}.md"
+          {
+            if [ -f "$NOTES_FILE" ]; then cat "$NOTES_FILE"; echo; fi
+            echo "## Installing"
+            echo
+            echo "Download and unzip, then try to open it. macOS will block it since Recap isn't notarized (a normal one-time step for an app downloaded outside the App Store, not a warning sign). Go to System Settings → Privacy & Security → Security and click Open Anyway next to the mention of Recap, confirm once more, and it opens normally after that. See the README for the full first-launch walkthrough."
+          } > notes.md
+          EXTRA=""
+          if [ ! -f "$NOTES_FILE" ]; then EXTRA="--generate-notes"; fi
           gh release create "${{ github.ref_name }}" Recap.app.zip \
             --title "Recap ${{ github.ref_name }}" \
-            --notes "Download and unzip, then try to open it — macOS will block it since Recap isn't notarized (a normal one-time step for an app downloaded outside the App Store, not a warning sign). Go to System Settings → Privacy & Security → Security and click Open Anyway next to the mention of Recap, confirm once more, and it opens normally after that. See the README for the full first-launch walkthrough."
+            --notes-file notes.md $EXTRA
