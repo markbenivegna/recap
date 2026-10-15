@@ -15,6 +15,11 @@ const transcribeErrorEl = document.getElementById("transcribeError");
 const transcribeErrorTextEl = document.getElementById("transcribeErrorText");
 const retryTranscribeBtn = document.getElementById("retryTranscribeBtn");
 const transcribeErrorStartOverBtn = document.getElementById("transcribeErrorStartOverBtn");
+const speakerEditBar = document.getElementById("speakerEditBar");
+const speakerEditText = document.getElementById("speakerEditText");
+const speakerUndoBtn = document.getElementById("speakerUndoBtn");
+const regenerateNotesBtn = document.getElementById("regenerateNotesBtn");
+const speakerMenu = document.getElementById("speakerMenu");
 const meetingTitleEl = document.getElementById("meetingTitle");
 const summaryContent = document.getElementById("summaryContent");
 const notesContent = document.getElementById("notesContent");
@@ -520,6 +525,9 @@ function showIdleControls(show) {
 
 function resetToNewRecording() {
   lastResult = null;
+  speakerMergeHistory = [];
+  renderSpeakerEditBar();
+  closeSpeakerMenu();
   lastFailedAudioArgs = null;
   resultsEl.hidden = true;
   transcribeErrorEl.hidden = true;
@@ -608,9 +616,16 @@ transcribeErrorStartOverBtn.addEventListener("click", resetToNewRecording);
 
 function renderTranscript(data) {
   lastResult = { ...lastResult, text: data.text, segments: data.segments };
+  speakerMergeHistory = [];
+  renderSpeakerEditBar();
+  redrawTranscript();
+  switchTab("transcript");
+}
+
+function redrawTranscript() {
   transcriptContent.innerHTML = "";
   let lastSpeaker = null;
-  data.segments.forEach((seg) => {
+  lastResult.segments.forEach((seg) => {
     const div = document.createElement("div");
     div.className = "transcript-segment";
 
@@ -633,21 +648,170 @@ function renderTranscript(data) {
     div.appendChild(timeSpan);
 
     if (seg.speaker && seg.speaker !== lastSpeaker) {
-      const speakerSpan = document.createElement("span");
-      speakerSpan.className = "transcript-speaker";
-      speakerSpan.textContent = `${seg.speaker}: `;
-      div.appendChild(speakerSpan);
+      div.appendChild(makeSpeakerLabel(seg.speaker));
       lastSpeaker = seg.speaker;
     }
 
     div.appendChild(document.createTextNode(seg.text));
     transcriptContent.appendChild(div);
   });
-  switchTab("transcript");
 }
 
-async function generateSummary(transcriptText) {
+// --- Merging speaker labels -------------------------------------------
+// Clustering can split one real person into two labels, and no threshold
+// reliably tells that apart from two similar-sounding people, so the user,
+// who knows who was in the meeting, gets to fix it by hand.
+let speakerMergeHistory = []; // newest last: { from, to, indices }
+let notesRegenerating = false;
+
+// Same turn-building as format_transcript_with_speakers in the backend:
+// consecutive segments from one speaker join into one turn, empty ones are
+// skipped. The text sent to the summarizer, Notion and Markdown export is
+// built from this, so it has to be rebuilt after every merge.
+function formatTranscriptText(segments) {
+  const turns = [];
+  for (const seg of segments) {
+    const text = (seg.text || "").trim();
+    if (!text) continue;
+    const last = turns[turns.length - 1];
+    if (last && last.speaker === seg.speaker) last.text += " " + text;
+    else turns.push({ speaker: seg.speaker, text });
+  }
+  return turns.map((t) => (t.speaker ? `${t.speaker}: ${t.text}` : t.text)).join("\n\n");
+}
+
+function makeSpeakerLabel(speaker) {
+  // "You" is anchored to the mic recording itself, not a guess, so it can't
+  // be merged away. Every other label is a guess worth correcting.
+  if (speaker === "You") {
+    const span = document.createElement("span");
+    span.className = "transcript-speaker";
+    span.textContent = `${speaker}: `;
+    return span;
+  }
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "transcript-speaker transcript-speaker-btn";
+  btn.textContent = `${speaker}:`;
+  btn.title = "Merge into another speaker";
+  btn.setAttribute("aria-haspopup", "menu");
+  btn.addEventListener("click", () => openSpeakerMenu(btn, speaker));
+  return btn;
+}
+
+function closeSpeakerMenu() {
+  speakerMenu.hidden = true;
+}
+
+function openSpeakerMenu(anchor, from) {
+  if (notesRegenerating) return;
+  const others = [...new Set(lastResult.segments.map((s) => s.speaker).filter((n) => n && n !== from))];
+  if (!others.length) return;
+
+  speakerMenu.innerHTML = "";
+  const title = document.createElement("div");
+  title.className = "speaker-menu-title";
+  title.textContent = `Merge ${from} into`;
+  speakerMenu.appendChild(title);
+  others.forEach((name) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "speaker-menu-item";
+    item.setAttribute("role", "menuitem");
+    item.textContent = name;
+    item.addEventListener("click", () => {
+      closeSpeakerMenu();
+      mergeSpeaker(from, name);
+    });
+    speakerMenu.appendChild(item);
+  });
+
+  speakerMenu.hidden = false;
+  const rect = anchor.getBoundingClientRect();
+  const menuRect = speakerMenu.getBoundingClientRect();
+  let left = rect.left;
+  let top = rect.bottom + 4;
+  if (left + menuRect.width > window.innerWidth - 8) left = window.innerWidth - menuRect.width - 8;
+  if (top + menuRect.height > window.innerHeight - 8) top = rect.top - menuRect.height - 4;
+  speakerMenu.style.left = `${Math.max(8, left)}px`;
+  speakerMenu.style.top = `${Math.max(8, top)}px`;
+  speakerMenu.querySelector(".speaker-menu-item").focus();
+}
+
+function renderSpeakerEditBar() {
+  if (!speakerMergeHistory.length) {
+    speakerEditBar.hidden = true;
+    return;
+  }
+  const last = speakerMergeHistory[speakerMergeHistory.length - 1];
+  speakerEditText.textContent = `Merged ${last.from} into ${last.to}. The summary and notes still use the old speakers.`;
+  speakerEditBar.hidden = false;
+}
+
+function afterSpeakerEdit() {
+  lastResult.text = formatTranscriptText(lastResult.segments);
+  const scrollTop = transcriptContent.scrollTop;
+  redrawTranscript();
+  transcriptContent.scrollTop = scrollTop;
+  renderSpeakerEditBar();
+}
+
+function mergeSpeaker(from, to) {
+  const indices = [];
+  lastResult.segments.forEach((seg, i) => {
+    if (seg.speaker === from) {
+      seg.speaker = to;
+      indices.push(i);
+    }
+  });
+  if (!indices.length) return;
+  speakerMergeHistory.push({ from, to, indices });
+  afterSpeakerEdit();
+}
+
+function undoSpeakerMerge() {
+  const last = speakerMergeHistory.pop();
+  if (!last) return;
+  last.indices.forEach((i) => {
+    lastResult.segments[i].speaker = last.from;
+  });
+  afterSpeakerEdit();
+}
+
+document.addEventListener("mousedown", (e) => {
+  if (!speakerMenu.hidden && !speakerMenu.contains(e.target)) closeSpeakerMenu();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !speakerMenu.hidden) closeSpeakerMenu();
+});
+transcriptContent.addEventListener("scroll", closeSpeakerMenu);
+window.addEventListener("resize", closeSpeakerMenu);
+speakerUndoBtn.addEventListener("click", undoSpeakerMerge);
+
+regenerateNotesBtn.addEventListener("click", async () => {
+  if (notesRegenerating || !lastResult) return;
+  notesRegenerating = true;
+  speakerUndoBtn.disabled = true;
+  regenerateNotesBtn.disabled = true;
+  setStatus("Regenerating notes...", false, true);
+  const ok = await generateSummary(lastResult.text, { regenerating: true });
+  notesRegenerating = false;
+  speakerUndoBtn.disabled = false;
+  regenerateNotesBtn.disabled = false;
+  // Once the notes match the transcript again there is nothing left to
+  // undo or regenerate. On failure the merges stay, so it can be retried.
+  if (ok) {
+    speakerMergeHistory = [];
+    renderSpeakerEditBar();
+  }
+});
+
+// `regenerating` is for redoing the notes on an already-shown result (after
+// merging speakers): the existing summary and notes stay on screen until the
+// new ones arrive, and a failure leaves them alone instead of clearing them.
+async function generateSummary(transcriptText, { regenerating = false } = {}) {
   const skeletonTimer = setTimeout(() => {
+    if (regenerating) return;
     renderSkeleton(summaryContent);
     renderSkeleton(notesContent);
   }, 500);
@@ -682,14 +846,22 @@ async function generateSummary(transcriptText) {
     );
     newRecordingBtn.hidden = false;
     downloadBtn.disabled = false;
-    if (notionConfigured) loadNotionPages();
+    // Reloading the page list resets the chosen destination to the first
+    // one, which would undo the user's pick just for redoing the notes.
+    if (notionConfigured && !regenerating) loadNotionPages();
     checkUsageAlert();
+    return true;
   } catch (err) {
     clearTimeout(skeletonTimer);
+    if (regenerating) {
+      setStatus(`Couldn't regenerate notes: ${err.message}`, true);
+      return false;
+    }
     summaryContent.textContent = "";
     notesContent.textContent = "";
     setStatus(`Summary error: ${err.message}`, true);
     showIdleControls(true);
+    return false;
   }
 }
 

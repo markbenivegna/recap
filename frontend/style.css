@@ -587,6 +587,85 @@ h1 {
   margin-right: 4px;
 }
 
+/* A clickable speaker label (everyone but "You") opens the merge menu.
+   Looks identical to the plain label until hovered. The margin stands in
+   for the trailing space the plain label carries, which inside a button
+   would get underlined. */
+.transcript-speaker-btn {
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-right: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.transcript-speaker-btn:hover {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.transcript-speaker-btn:focus-visible {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: 2px;
+}
+
+.btn-small {
+  padding: 6px 10px;
+  font-size: 13px;
+  line-height: 18px;
+  border-radius: 6px;
+}
+
+/* Sits above the transcript card, not inside it, so it never scrolls away. */
+.speaker-edit-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.speaker-edit-bar[hidden] { display: none; }
+.speaker-edit-text { flex: 1; min-width: 0; }
+
+.speaker-menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 180px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  font-size: 13px;
+}
+.speaker-menu[hidden] { display: none; }
+.speaker-menu-title {
+  padding: 6px 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.speaker-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+.speaker-menu-item:hover,
+.speaker-menu-item:focus-visible {
+  background: var(--hover-bg);
+  outline: none;
+}
+
 .file-bar {
   flex-shrink: 0;
   display: flex;

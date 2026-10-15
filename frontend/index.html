@@ -259,6 +259,11 @@
       </section>
 
       <section id="tab-transcript" class="tab-panel">
+        <div id="speakerEditBar" class="speaker-edit-bar" hidden>
+          <span id="speakerEditText" class="speaker-edit-text"></span>
+          <button id="speakerUndoBtn" class="btn btn-small" type="button">Undo</button>
+          <button id="regenerateNotesBtn" class="btn btn-primary btn-small" type="button">Regenerate notes</button>
+        </div>
         <div id="transcriptContent" class="panel-content transcript"></div>
       </section>
 
@@ -283,6 +288,8 @@
     </div>
   </main>
 </div>
+
+<div id="speakerMenu" class="speaker-menu" role="menu" hidden></div>
 
 <script src="vendor/lottie.min.js"></script>
 <script src="app.js"></script>
