@@ -74,6 +74,7 @@ const cfgDiarizationThreshold = document.getElementById("cfgDiarizationThreshold
 const cfgDiarizationThresholdValue = document.getElementById("cfgDiarizationThresholdValue");
 const cfgShowMenuBarIcon = document.getElementById("cfgShowMenuBarIcon");
 const cfgDetectMeetings = document.getElementById("cfgDetectMeetings");
+const cfgCheckUpdates = document.getElementById("cfgCheckUpdates");
 const usageValueText = document.getElementById("usageValueText");
 const usagePill = document.getElementById("usagePill");
 const usageRingFill = document.getElementById("usageRingFill");
@@ -143,6 +144,7 @@ async function maybeShowAudioTip() {
     if (cfg.SYSTEM_AUDIO_TIP_IGNORED === "true") return;
     const seenBefore = cfg.SYSTEM_AUDIO_TIP_SEEN === "true";
     audioTipIgnoreBtn.hidden = !seenBefore;
+    updateTipEl.hidden = true;
     audioTipEl.hidden = false;
     if (!seenBefore) saveConfigFlags({ SYSTEM_AUDIO_TIP_SEEN: "true" });
   } catch (err) {
@@ -156,6 +158,40 @@ audioTipDismissBtn.addEventListener("click", () => {
 audioTipIgnoreBtn.addEventListener("click", () => {
   audioTipEl.hidden = true;
   saveConfigFlags({ SYSTEM_AUDIO_TIP_IGNORED: "true" });
+});
+
+const updateTipEl = document.getElementById("updateTip");
+const updateTipTitleEl = document.getElementById("updateTipTitle");
+const updateTipDownloadLink = document.getElementById("updateTipDownloadLink");
+let pendingUpdateVersion = null;
+
+// Runs once at launch. Only ever a notice with a download link, not an
+// installer. Skipping a version stays quiet until an even newer one ships.
+async function checkForUpdate(cfg) {
+  if (cfg.CHECK_FOR_UPDATES === "false") return;
+  try {
+    const res = await fetch("/api/update-check");
+    const info = await res.json();
+    if (!info.update_available || info.latest === cfg.SKIPPED_UPDATE_VERSION) return;
+    pendingUpdateVersion = info.latest;
+    updateTipTitleEl.textContent = `Recap ${info.latest} is available (you have ${info.current})`;
+    updateTipDownloadLink.href = info.url;
+    // Don't stack on top of the recording tip.
+    updateTipEl.hidden = !audioTipEl.hidden;
+  } catch (err) {
+    // A failed update check is never worth bothering anyone about.
+  }
+}
+
+document.getElementById("updateTipLaterBtn").addEventListener("click", () => {
+  updateTipEl.hidden = true;
+});
+document.getElementById("updateTipSkipBtn").addEventListener("click", () => {
+  updateTipEl.hidden = true;
+  saveConfigFlags({ SKIPPED_UPDATE_VERSION: pendingUpdateVersion });
+});
+updateTipDownloadLink.addEventListener("click", () => {
+  updateTipEl.hidden = true;
 });
 
 let toastTimer = null;
@@ -1127,6 +1163,7 @@ async function openSettings({ isFirstRun = false } = {}) {
     cfgSummaryDetailValue.textContent = SUMMARY_DETAIL_LABELS[cfgSummaryDetail.value];
     cfgShowMenuBarIcon.checked = data.SHOW_MENU_BAR_ICON !== "false";
     cfgDetectMeetings.checked = data.DETECT_MEETINGS !== "false";
+    cfgCheckUpdates.checked = data.CHECK_FOR_UPDATES !== "false";
     loadUsageDisplay();
   } catch (err) {
     showToast(`Could not load current settings: ${err.message}`, true);
@@ -1163,6 +1200,7 @@ async function saveSettings() {
         SUMMARY_DETAIL_LEVEL: SUMMARY_DETAIL_LEVELS[Number(cfgSummaryDetail.value)],
         SHOW_MENU_BAR_ICON: String(cfgShowMenuBarIcon.checked),
         DETECT_MEETINGS: String(cfgDetectMeetings.checked),
+        CHECK_FOR_UPDATES: String(cfgCheckUpdates.checked),
       }),
     });
     const data = await res.json();
@@ -1187,6 +1225,7 @@ async function saveSettings() {
   cfgSummaryDetail,
   cfgShowMenuBarIcon,
   cfgDetectMeetings,
+  cfgCheckUpdates,
 ].forEach((el) => {
   el.addEventListener("change", saveSettings);
 });
@@ -1214,6 +1253,7 @@ cfgSummaryDetail.addEventListener("input", () => {
     if (!data.ANTHROPIC_API_KEY) {
       openSettings({ isFirstRun: true });
     }
+    checkForUpdate(data);
   } catch (err) {
     // Non-fatal — settings just won't auto-open.
   }

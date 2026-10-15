@@ -91,6 +91,13 @@
                 </div>
                 <input type="checkbox" id="cfgDetectMeetings" class="toggle-switch" />
               </label>
+              <label class="field field-toggle">
+                <div class="field-toggle-text">
+                  <span>Check for updates</span>
+                  <small>When Recap opens, checks GitHub for a newer release and lets you know. Nothing else is sent.</small>
+                </div>
+                <input type="checkbox" id="cfgCheckUpdates" class="toggle-switch" />
+              </label>
             </section>
 
             <section class="settings-panel" data-category="recording">
@@ -223,6 +230,16 @@
 
   <div id="toast" class="toast" hidden>
     <span id="toastText"></span>
+  </div>
+
+  <div id="updateTip" class="audio-tip" role="status" hidden>
+    <div class="audio-tip-title" id="updateTipTitle">A new version of Recap is available</div>
+    <p class="audio-tip-body">Download it from GitHub, then replace the app in your Applications folder.</p>
+    <div class="audio-tip-actions">
+      <button type="button" id="updateTipSkipBtn" class="btn btn-secondary">Skip this version</button>
+      <button type="button" id="updateTipLaterBtn" class="btn btn-secondary">Later</button>
+      <a id="updateTipDownloadLink" class="btn btn-primary" href="#" target="_blank">Download</a>
+    </div>
   </div>
 
   <div id="audioTip" class="audio-tip" role="status" hidden>

@@ -10,7 +10,7 @@ from backend.paths import ENV_PATH, RECORDINGS_DIR
 
 load_dotenv(ENV_PATH)
 
-from backend import audio_switch, config as app_config, markdown_export, notion_client, usage_tracker
+from backend import audio_switch, config as app_config, markdown_export, notion_client, updates, usage_tracker
 from backend.diarize import diarize_segments, diarize_with_source_separation, format_transcript_with_speakers
 from backend.summarize import add_missing_topics, summarize_transcript
 from backend.transcribe import transcribe_audio
@@ -176,6 +176,11 @@ def api_settings_post():
     except Exception:
         pass
     return jsonify({"ok": True})
+
+
+@app.route("/api/update-check", methods=["GET"])
+def api_update_check():
+    return jsonify(updates.check_for_update())
 
 
 @app.route("/api/usage", methods=["GET"])

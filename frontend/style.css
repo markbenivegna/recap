@@ -1425,6 +1425,10 @@ h1 {
   white-space: nowrap;
 }
 
+.audio-tip-actions a.btn {
+  text-decoration: none;
+}
+
 .audio-tip-actions {
   display: flex;
   justify-content: flex-end;
