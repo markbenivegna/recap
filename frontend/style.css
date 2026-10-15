@@ -227,6 +227,18 @@ h1 {
   background: #c02719;
 }
 
+/* Pressed = mic is muted. Needs its own :hover rule at the same specificity
+   as the generic .btn:hover:not(:disabled), or hovering a muted button
+   would flash back to the neutral hover fill. */
+.btn-mute[aria-pressed="true"] {
+  background: color-mix(in srgb, #d92d20 10%, var(--panel));
+  color: #d92d20;
+  box-shadow: 0 0 0 1px #d92d20, var(--shadow-xs);
+}
+.btn-mute[aria-pressed="true"]:hover:not(:disabled) {
+  background: color-mix(in srgb, #d92d20 16%, var(--panel));
+}
+
 .file-label { position: relative; }
 
 .timer {
@@ -245,6 +257,13 @@ h1 {
 
 .recording-dot[hidden] {
   display: none;
+}
+
+/* Mic muted: the pulsing red dot says "actively recording you", which
+   stops being true — go still and neutral instead. */
+.recording-dot.muted {
+  animation: none;
+  background: var(--muted);
 }
 
 @keyframes recording-pulse {

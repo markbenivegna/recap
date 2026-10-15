@@ -1,4 +1,5 @@
 const recordBtn = document.getElementById("recordBtn");
+const muteBtn = document.getElementById("muteBtn");
 const fileInput = document.getElementById("fileInput");
 const timerEl = document.getElementById("timer");
 const recordingDotEl = document.getElementById("recordingDot");
@@ -167,6 +168,9 @@ document.querySelectorAll(".settings-nav-item").forEach((btn) => {
 });
 
 let activeStreams = [];
+let liveMicStream = null;
+let micMuted = false;
+let recordingHasSystemAudio = false;
 let audioCtx = null;
 let waveformAnalyser = null;
 let waveformTimer = null;
@@ -311,6 +315,38 @@ async function findBlackHoleDeviceId() {
   return match ? match.deviceId : null;
 }
 
+function recordingSubtext() {
+  if (micMuted) {
+    return recordingHasSystemAudio
+      ? "Mic muted. Capturing system audio only."
+      : "Mic muted. Nothing is being captured.";
+  }
+  return recordingHasSystemAudio ? "Capturing your mic and system audio." : "Capturing your mic.";
+}
+
+function setMicMuted(muted) {
+  micMuted = muted;
+  // A disabled track emits silence, so everything fed by the mic (the mix
+  // and the separate mic-only recording) records silence while the
+  // system-audio track keeps going, and all three recordings stay
+  // time-aligned. Pausing the recorders instead would drop that span from
+  // each file and shift every later timestamp.
+  if (liveMicStream) liveMicStream.getAudioTracks().forEach((t) => (t.enabled = !muted));
+  muteBtn.textContent = muted ? "Unmute mic" : "Mute mic";
+  muteBtn.setAttribute("aria-pressed", String(muted));
+  recordingDotEl.classList.toggle("muted", muted);
+  recordingAnimationTextEl.textContent = recordingSubtext();
+}
+
+function resetMicMute() {
+  micMuted = false;
+  liveMicStream = null;
+  muteBtn.hidden = true;
+  muteBtn.textContent = "Mute mic";
+  muteBtn.setAttribute("aria-pressed", "false");
+  recordingDotEl.classList.remove("muted");
+}
+
 async function startRecording() {
   try {
     // Switch system audio output to the recording device (e.g. a
@@ -334,6 +370,7 @@ async function startRecording() {
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
     });
     activeStreams = [micStream];
+    liveMicStream = micStream;
 
     let usingSystemAudio = false;
     let systemStream = null;
@@ -422,7 +459,11 @@ async function startRecording() {
     // recording, no matter how it got left that way.
     resultsEl.hidden = true;
     newRecordingBtn.hidden = true;
-    playRecordingAnimation(usingSystemAudio ? "Capturing your mic and system audio." : "Capturing your mic.");
+    recordingHasSystemAudio = usingSystemAudio;
+    micMuted = false;
+    playRecordingAnimation(recordingSubtext());
+    muteBtn.hidden = false;
+    setMicMuted(false);
     recordingStart = Date.now();
     recordBtn.textContent = "Stop";
     recordBtn.classList.add("recording");
@@ -447,6 +488,7 @@ function stopRecording() {
       if (r && r.state !== "inactive") r.stop();
     });
     recording = false;
+    resetMicMute();
     recordBtn.textContent = "Record";
     recordBtn.classList.remove("recording");
     clearInterval(timerInterval);
@@ -454,6 +496,10 @@ function stopRecording() {
     timerEl.hidden = true;
   }
 }
+
+muteBtn.addEventListener("click", () => {
+  if (recording) setMicMuted(!micMuted);
+});
 
 recordBtn.addEventListener("click", () => {
   if (recording) {
