@@ -1421,6 +1421,11 @@ h1 {
   text-decoration: underline;
 }
 
+.audio-tip-body code,
+.field small code {
+  white-space: nowrap;
+}
+
 .audio-tip-actions {
   display: flex;
   justify-content: flex-end;
