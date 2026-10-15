@@ -231,6 +231,20 @@ h1 {
    [hidden]{display:none} on specificity. */
 .btn-mute[hidden] { display: none; }
 
+/* The live level meter: a rect the size of the mic capsule, scaled up from
+   its bottom edge by --mic-level (0 to 1, set from JS) and clipped to the
+   capsule by the <g> around it in the markup. The clip has to sit on that
+   parent group, not on this rect, or it would scale down with the rect
+   instead of staying put. */
+.mic-level {
+  fill: var(--accent-hover);
+  stroke: none;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transform: scaleY(var(--mic-level, 0));
+  transition: transform 60ms linear;
+}
+
 .btn-mute .icon-mic-off { display: none; }
 .btn-mute[aria-pressed="true"] .icon-mic { display: none; }
 .btn-mute[aria-pressed="true"] .icon-mic-off { display: block; }
@@ -346,23 +360,6 @@ h1 {
   }
 }
 
-.waveform {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 32px;
-}
-
-.waveform[hidden] {
-  display: none;
-}
-
-.waveform-bar {
-  width: 5px;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--accent-hover);
-}
 
 /* Their empty-state.tsx pattern: a featured icon, a heading, then
    supporting text — not just a single line of muted copy. */

@@ -3,8 +3,6 @@ const muteBtn = document.getElementById("muteBtn");
 const fileInput = document.getElementById("fileInput");
 const timerEl = document.getElementById("timer");
 const recordingDotEl = document.getElementById("recordingDot");
-const waveformEl = document.getElementById("waveform");
-const waveformBars = waveformEl.querySelectorAll(".waveform-bar");
 const statusEl = document.getElementById("status");
 const statusTextEl = document.getElementById("statusText");
 const statusSpinnerEl = document.getElementById("statusSpinner");
@@ -172,8 +170,8 @@ let liveMicStream = null;
 let micMuted = false;
 let recordingHasSystemAudio = false;
 let audioCtx = null;
-let waveformAnalyser = null;
-let waveformTimer = null;
+let micMeterAnalyser = null;
+let micMeterTimer = null;
 
 // Lazily loaded so the (relatively large) animation JSON is only fetched
 // once someone actually hits Record, not on every app launch.
@@ -182,7 +180,7 @@ let recordingAnimationTimer = null;
 let recordingAnimationStart = 0;
 
 // Lottie's own autoplay/loop ticks itself via requestAnimationFrame, which
-// hits the exact same pywebview bug documented on startWaveform() above:
+// hits the exact same pywebview bug documented on startMicMeter() below:
 // rAF can silently stall while the native window isn't considered
 // "visible" even though it's genuinely on screen, then dumps a backlog of
 // frames all at once when it resumes — the "fragmented and slow" look.
@@ -223,20 +221,20 @@ function stopRecordingAnimation() {
   }
 }
 
-function startWaveform(stream) {
+// Drives the mic icon's level fill (.mic-level in style.css) from the mic
+// stream's loudness, so the one mic button is both the mute control and the
+// "is it hearing me" meter.
+function startMicMeter(stream) {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  waveformAnalyser = audioCtx.createAnalyser();
-  waveformAnalyser.fftSize = 256;
-  audioCtx.createMediaStreamSource(stream).connect(waveformAnalyser);
+  micMeterAnalyser = audioCtx.createAnalyser();
+  micMeterAnalyser.fftSize = 256;
+  audioCtx.createMediaStreamSource(stream).connect(micMeterAnalyser);
 
-  // Frequency-bin-per-bar (an earlier approach) meant most bars landed on
-  // higher-frequency bins where voice has almost no energy, so only the
-  // first bar ever visibly moved. Use one overall volume level (RMS of the
-  // time-domain signal) instead, applied to every bar with a small fixed
-  // per-bar multiplier for natural-looking variation — all bars react
-  // together to actual signal.
+  // One overall volume level (RMS of the time-domain signal) rather than
+  // frequency bins: voice has almost no energy in the higher bins, so a
+  // per-bin readout barely moved.
   //
   // Driven by setInterval, not requestAnimationFrame: rAF is spec'd to stop
   // firing whenever the page isn't considered "visible", and pywebview's
@@ -244,13 +242,10 @@ function startWaveform(stream) {
   // real browser tab does — so rAF can silently never run at all here, even
   // though the window is genuinely on screen. setInterval isn't gated by
   // that.
-  const barMultipliers = Array.from(waveformBars, () => 0.7 + Math.random() * 0.6);
-  const data = new Uint8Array(waveformAnalyser.fftSize);
-  const MIN_HEIGHT = 4;
-  const MAX_HEIGHT = 32;
+  const data = new Uint8Array(micMeterAnalyser.fftSize);
 
   function rms() {
-    waveformAnalyser.getByteTimeDomainData(data);
+    micMeterAnalyser.getByteTimeDomainData(data);
     let sumSquares = 0;
     for (let i = 0; i < data.length; i++) {
       const v = (data[i] - 128) / 128;
@@ -261,7 +256,7 @@ function startWaveform(stream) {
 
   // A flat sqrt curve on raw RMS (a prior version of this) boosted quiet
   // levels so aggressively that ambient/background noise flickered the
-  // bars too, while actual speech barely stood out above that already-
+  // meter too, while actual speech barely stood out above that already-
   // boosted floor. Calibrate to this room's actual ambient noise level for
   // the first ~500ms instead of guessing a fixed threshold — quiet vs
   // noisy rooms need different cutoffs for "is this your voice, or just
@@ -277,32 +272,30 @@ function startWaveform(stream) {
     calibrating = false;
   }, 500);
 
-  waveformTimer = setInterval(() => {
+  micMeterTimer = setInterval(() => {
     const level = rms();
     if (calibrating) {
       calibrationSamples.push(level);
-      return; // hold at baseline while sampling ambient noise
+      return; // hold at empty while sampling ambient noise
     }
     const ceiling = Math.max(noiseFloor + 0.05, 0.22);
     const gated = Math.max(0, level - noiseFloor);
     const normalized = Math.min(1, gated / (ceiling - noiseFloor));
-    const scaled = Math.sqrt(normalized);
-    waveformBars.forEach((bar, i) => {
-      const height = MIN_HEIGHT + scaled * (MAX_HEIGHT - MIN_HEIGHT) * barMultipliers[i];
-      bar.style.height = `${Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, height))}px`;
-    });
+    setMicLevel(Math.sqrt(normalized));
   }, 60);
-  waveformEl.hidden = false;
 }
 
-function stopWaveform() {
-  if (waveformTimer) {
-    clearInterval(waveformTimer);
-    waveformTimer = null;
+function setMicLevel(level) {
+  muteBtn.style.setProperty("--mic-level", String(level));
+}
+
+function stopMicMeter() {
+  if (micMeterTimer) {
+    clearInterval(micMeterTimer);
+    micMeterTimer = null;
   }
-  waveformAnalyser = null;
-  waveformEl.hidden = true;
-  waveformBars.forEach((bar) => (bar.style.height = "4px"));
+  micMeterAnalyser = null;
+  setMicLevel(0);
 }
 
 async function findBlackHoleDeviceId() {
@@ -476,7 +469,7 @@ async function startRecording() {
     timerInterval = setInterval(() => {
       timerEl.textContent = formatTimer(Date.now() - recordingStart);
     }, 250);
-    startWaveform(mixedStream);
+    startMicMeter(micStream);
     setStatus("");
   } catch (err) {
     setStatus(`Could not access microphone: ${err.message}`, true);
@@ -485,7 +478,7 @@ async function startRecording() {
 
 function stopRecording() {
   if (mediaRecorder && recording) {
-    stopWaveform();
+    stopMicMeter();
     stopRecordingAnimation();
     [mediaRecorder, micRecorder, systemRecorder].forEach((r) => {
       if (r && r.state !== "inactive") r.stop();
