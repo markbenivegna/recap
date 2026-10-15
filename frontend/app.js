@@ -1211,7 +1211,13 @@ async function checkUsageAlert() {
   }
 }
 
+// Every field autosaves the whole form, so saving before the saved values
+// have actually been filled in would write blanks over them (API keys
+// included). Saving stays blocked until a load has succeeded.
+let settingsLoaded = false;
+
 async function openSettings({ isFirstRun = false } = {}) {
+  settingsLoaded = false;
   settingsIntro.hidden = !isFirstRun;
   switchSettingsCategory(isFirstRun ? "api-keys" : "general");
   try {
@@ -1232,6 +1238,7 @@ async function openSettings({ isFirstRun = false } = {}) {
     cfgDetectMeetings.checked = data.DETECT_MEETINGS !== "false";
     cfgCheckUpdates.checked = data.CHECK_FOR_UPDATES !== "false";
     setAppearance(["light", "dark"].includes(data.APPEARANCE) ? data.APPEARANCE : "system");
+    settingsLoaded = true;
     loadUsageDisplay();
   } catch (err) {
     showToast(`Could not load current settings: ${err.message}`, true);
@@ -1253,6 +1260,7 @@ settingsCloseBtn.addEventListener("click", closeSettings);
 settingsForm.addEventListener("submit", (e) => e.preventDefault());
 
 async function saveSettings() {
+  if (!settingsLoaded) return;
   try {
     const res = await fetch("/api/settings", {
       method: "POST",
